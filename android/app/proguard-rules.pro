@@ -5,10 +5,20 @@
 -keep class io.flutter.view.**  { *; }
 -keep class io.flutter.**  { *; }
 -keep class io.flutter.plugins.**  { *; }
+-keep class io.flutter.embedding.** { *; }
 
-# Firebase
--keep class com.google.firebase.** { *; }
+# Google Play Services
 -keep class com.google.android.gms.** { *; }
+-keep class com.google.firebase.** { *; }
+-dontwarn com.google.android.gms.**
+-dontwarn com.google.firebase.**
+
+# Play Core Library
+-keep class com.google.android.play.core.** { *; }
+-keep class com.google.android.play.core.splitcompat.** { *; }
+-keep class com.google.android.play.core.splitinstall.** { *; }
+-keep class com.google.android.play.core.tasks.** { *; }
+-dontwarn com.google.android.play.core.**
 
 # Gson
 -keepattributes Signature
