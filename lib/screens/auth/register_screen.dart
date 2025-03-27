@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:fluttertoast/fluttertoast.dart';
 import '../../services/auth_service.dart';
 import '../../styles/auth_styles.dart';
+import '../../utils/toast_utils.dart';
 import '../main_screen.dart';
 import './login_screen.dart';
 
@@ -33,23 +33,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
       _isLoading = false;
     });
 
-    Fluttertoast.showToast(
-      msg: message,
-      toastLength: Toast.LENGTH_LONG,
-      gravity: ToastGravity.BOTTOM,
-      backgroundColor: Colors.red,
-      textColor: Colors.white,
-    );
+    ToastUtils.showErrorToast(message, context: context);
   }
 
   void _showSuccess(String message) {
-    Fluttertoast.showToast(
-      msg: message,
-      toastLength: Toast.LENGTH_LONG,
-      gravity: ToastGravity.BOTTOM,
-      backgroundColor: Colors.green,
-      textColor: Colors.white,
-    );
+    ToastUtils.showSuccessToast(message, context: context);
   }
 
   Future<void> _register() async {
