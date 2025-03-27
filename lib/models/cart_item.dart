@@ -8,6 +8,7 @@ class CartItem {
   final String? cakeText;
   final int quantity;
   final double price;
+  final Map<String, dynamic> selectedOptions;
 
   CartItem({
     required this.id,
@@ -17,6 +18,7 @@ class CartItem {
     this.cakeText,
     required this.quantity,
     required this.price,
+    this.selectedOptions = const {},
   });
 
   double get totalPrice => price * quantity;
@@ -29,6 +31,7 @@ class CartItem {
     String? cakeText,
     int? quantity,
     double? price,
+    Map<String, dynamic>? selectedOptions,
   }) {
     return CartItem(
       id: id ?? this.id,
@@ -38,6 +41,7 @@ class CartItem {
       cakeText: cakeText ?? this.cakeText,
       quantity: quantity ?? this.quantity,
       price: price ?? this.price,
+      selectedOptions: selectedOptions ?? this.selectedOptions,
     );
   }
 
@@ -50,6 +54,7 @@ class CartItem {
       'cakeText': cakeText,
       'quantity': quantity,
       'price': price,
+      'selectedOptions': selectedOptions,
     };
   }
 }

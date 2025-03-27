@@ -15,7 +15,7 @@ class AddressScreen extends StatefulWidget {
 class _AddressScreenState extends State<AddressScreen> {
   final _apiService = ApiService();
   bool _isLoading = true;
-  Map<String, bool> _operationLoading = {};
+  final Map<String, bool> _operationLoading = {};
   List<Address> _addresses = [];
   Address? _addressesCache;
 

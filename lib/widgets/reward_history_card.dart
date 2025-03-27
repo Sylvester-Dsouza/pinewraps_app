@@ -25,7 +25,11 @@ class RewardHistoryCard extends StatelessWidget {
           width: 40,
           height: 40,
           decoration: BoxDecoration(
-            color: isEarned ? Colors.green[50] : Colors.red[50],
+            color: Colors.white,
+            border: Border.all(
+              color: isEarned ? Colors.green : Colors.red,
+              width: 1,
+            ),
             borderRadius: BorderRadius.circular(20),
           ),
           child: Icon(

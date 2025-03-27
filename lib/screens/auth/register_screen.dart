@@ -4,6 +4,7 @@ import 'package:fluttertoast/fluttertoast.dart';
 import '../../services/auth_service.dart';
 import '../../styles/auth_styles.dart';
 import '../main_screen.dart';
+import './login_screen.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -41,6 +42,16 @@ class _RegisterScreenState extends State<RegisterScreen> {
     );
   }
 
+  void _showSuccess(String message) {
+    Fluttertoast.showToast(
+      msg: message,
+      toastLength: Toast.LENGTH_LONG,
+      gravity: ToastGravity.BOTTOM,
+      backgroundColor: Colors.green,
+      textColor: Colors.white,
+    );
+  }
+
   Future<void> _register() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -50,6 +61,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     });
 
     try {
+      // Register the user
       await _authService.registerWithEmailPassword(
         email: _emailController.text,
         password: _passwordController.text,
@@ -59,9 +71,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
       );
 
       if (mounted) {
-        // Navigate to main screen and remove all previous routes
+        _showSuccess('Registration successful! Please login to continue.');
+        
+        // Navigate to login screen and remove all previous routes
         Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (context) => const MainScreen()),
+          MaterialPageRoute(
+            builder: (context) => const LoginScreen(),
+          ),
           (route) => false,
         );
       }
@@ -81,16 +97,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Register'),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.pop(context),
-        ),
-        centerTitle: true,
-        elevation: 0,
-        backgroundColor: Colors.transparent,
-      ),
+      backgroundColor: Colors.white,
       body: SafeArea(
         child: Stack(
           children: [
@@ -108,10 +115,31 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       textAlign: TextAlign.center,
                     ),
                     const SizedBox(height: 8),
-                    Text(
-                      'Sign up to start shopping',
-                      style: AuthStyles.subtitleStyle,
-                      textAlign: TextAlign.center,
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          'Already have an account? ',
+                          style: AuthStyles.subtitleStyle,
+                        ),
+                        GestureDetector(
+                          onTap: () {
+                            Navigator.pushReplacement(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => const LoginScreen(),
+                              ),
+                            );
+                          },
+                          child: Text(
+                            'Login',
+                            style: AuthStyles.subtitleStyle.copyWith(
+                              color: Theme.of(context).primaryColor,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 32),
                     TextFormField(
@@ -168,6 +196,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       decoration: AuthStyles.inputDecoration('Phone *')
                         .copyWith(
                           prefixIcon: const Icon(Icons.phone_outlined),
+                          prefixText: '+971 ',
+                          prefixStyle: const TextStyle(
+                            color: Colors.black,
+                            fontSize: 16,
+                          ),
                         ),
                       keyboardType: TextInputType.phone,
                       textInputAction: TextInputAction.next,
@@ -175,7 +208,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         if (value == null || value.isEmpty) {
                           return 'Please enter your phone number';
                         }
-                        // Add phone number validation if needed
+                        // Validate UAE phone number format
+                        final phoneNum = value.trim();
+                        if (!RegExp(r'^[0-9]{9}$').hasMatch(phoneNum)) {
+                          return 'Please enter a valid 9-digit phone number';
+                        }
                         return null;
                       },
                     ),
@@ -256,18 +293,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           : const Text('Register'),
                     ),
                     const SizedBox(height: 24),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Text('Already have an account?'),
-                        TextButton(
-                          onPressed: () {
-                            Navigator.pushReplacementNamed(context, '/login');
-                          },
-                          child: const Text('Login'),
-                        ),
-                      ],
-                    ),
                   ],
                 ),
               ),

@@ -5,6 +5,10 @@ import '../../models/product.dart';
 import '../../services/product_service.dart';
 import '../product/product_details_screen.dart';
 import '../shop/shop_screen.dart';
+import '../main_screen.dart';
+import '../notifications/notification_screen.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../../widgets/notification_icon.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({Key? key}) : super(key: key);
@@ -32,17 +36,45 @@ class _HomeScreenState extends State<HomeScreen> {
         _error = null;
       });
       
-      final products = await _productService.getAllProducts();
-      setState(() {
-        _products = products;
-        _isLoading = false;
-      });
+      print('Home screen: Loading featured products');
+      // Use the product service to get a limited number of products for the home screen
+      final products = await _productService.getAllProducts(limit: 8);
+      
+      if (mounted) {
+        setState(() {
+          _products = products;
+          _isLoading = false;
+        });
+        print('Home screen: Loaded ${products.length} products successfully');
+      }
     } catch (e) {
       print('Error in _loadProducts: $e');
-      setState(() {
-        _isLoading = false;
-        _error = e.toString();
-      });
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          
+          // Extract the most user-friendly part of the error message
+          String errorMsg = e.toString();
+          if (errorMsg.contains('Could not connect to the server')) {
+            if (errorMsg.contains('physical device')) {
+              // This is a special error message we added for physical devices
+              _error = errorMsg;
+            } else {
+              _error = 'Could not connect to the server. Please check if the server is running.';
+            }
+          } else if (errorMsg.contains('Connection timed out')) {
+            _error = 'Connection timed out. Please check your internet connection.';
+          } else if (errorMsg.contains('Connection refused')) {
+            _error = 'Could not connect to the server. If you\'re using a physical device, make sure the server IP address is correct.';
+          } else {
+            // Limit error message length to avoid UI issues
+            if (errorMsg.length > 100) {
+              errorMsg = '${errorMsg.substring(0, 100)}...';
+            }
+            _error = 'Failed to load products: $errorMsg';
+          }
+        });
+      }
     }
   }
 
@@ -59,32 +91,7 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         centerTitle: true,
         actions: [
-          Stack(
-            children: [
-              IconButton(
-                icon: const Icon(LineIcons.bell),
-                onPressed: () {},
-              ),
-              Positioned(
-                right: 8,
-                top: 8,
-                child: Container(
-                  padding: const EdgeInsets.all(4),
-                  decoration: const BoxDecoration(
-                    color: Colors.red,
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Text(
-                    '1',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 10,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
+          const NotificationIcon(),
         ],
       ),
       drawer: const AppDrawer(),
@@ -118,7 +125,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       const Text(
-                        "For Every Occasion",
+                        "Welcome to Pinewraps",
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           color: Colors.white,
@@ -128,7 +135,14 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                       const SizedBox(height: 16),
                       ElevatedButton(
-                        onPressed: () {},
+                        onPressed: () {
+                          Navigator.pushReplacement(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const MainScreen(initialIndex: 1),
+                            ),
+                          );
+                        },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.black,
                           foregroundColor: Colors.white,
@@ -222,7 +236,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 ],
               ),
             ),
-const SizedBox(height: 20),
+            const SizedBox(height: 20),
 
             // New Arrivals Grid
             if (_isLoading)
@@ -237,15 +251,29 @@ const SizedBox(height: 20),
                 padding: const EdgeInsets.all(20.0),
                 child: Column(
                   children: [
-                    Text(
-                      'Error loading products: $_error',
-                      style: const TextStyle(color: Colors.red),
-                      textAlign: TextAlign.center,
+                    const Icon(
+                      Icons.error_outline,
+                      size: 48,
+                      color: Colors.grey,
                     ),
-                    const SizedBox(height: 10),
-                    ElevatedButton(
+                    const SizedBox(height: 16),
+                    Text(
+                      _error!,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        color: Colors.grey,
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    ElevatedButton.icon(
                       onPressed: _loadProducts,
-                      child: const Text('Retry'),
+                      icon: const Icon(Icons.refresh),
+                      label: const Text('Try Again'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.black,
+                        foregroundColor: Colors.white,
+                      ),
                     ),
                   ],
                 ),
@@ -261,21 +289,24 @@ const SizedBox(height: 20),
                 ),
               )
             else
-              GridView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
+              Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 2,
-                  childAspectRatio: 0.75,
-                  crossAxisSpacing: 16,
-                  mainAxisSpacing: 20,
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final cardWidth = (constraints.maxWidth - 16) / 2;
+                    return Wrap(
+                      spacing: 16,
+                      runSpacing: 20,
+                      children: _products
+                          .take(4)
+                          .map((product) => SizedBox(
+                                width: cardWidth,
+                                child: _buildProductCard(product),
+                              ))
+                          .toList(),
+                    );
+                  },
                 ),
-                itemCount: _products.length > 4 ? 4 : _products.length,
-                itemBuilder: (context, index) {
-                  final product = _products[index];
-                  return _buildProductCard(product);
-                },
               ),
 
             const SizedBox(height: 32),
@@ -285,7 +316,7 @@ const SizedBox(height: 20),
               margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color: Colors.grey[50],
+                color: Colors.white,
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(
                   color: Colors.grey[200]!,
@@ -299,7 +330,8 @@ const SizedBox(height: 20),
                       Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: Colors.black.withOpacity(0.05),
+                          color: Colors.white,
+                          border: Border.all(color: Colors.black.withOpacity(0.1)),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: const Icon(
@@ -322,7 +354,7 @@ const SizedBox(height: 20),
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              'Get 1 point for every order',
+                              'Redeem Points for Rewards',
                               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                                 color: Colors.grey[600],
                               ),
@@ -367,27 +399,17 @@ const SizedBox(height: 20),
   }
 
   Widget _buildCategoryCard(String title, String items, IconData icon) {
-    String imagePath;
-    switch (title) {
-      case 'Cakes':
-        imagePath = 'assets/images/category_cakes.jpg';
-        break;
-      case 'Flowers':
-        imagePath = 'assets/images/category_flowers.jpg';
-        break;
-      case 'Sets':
-        imagePath = 'assets/images/category_combos.jpg';
-        break;
-      default:
-        imagePath = 'assets/images/category_default.jpg';
-    }
+    String imagePath = 'assets/images/category_${title.toLowerCase()}.jpg';
 
     return GestureDetector(
       onTap: () {
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (context) => ShopScreen(initialCategory: title),
+            builder: (context) => MainScreen(
+              initialIndex: 1,
+              shopCategory: title,
+            ),
           ),
         );
       },
@@ -450,64 +472,68 @@ const SizedBox(height: 20),
           ),
         );
       },
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.06),
-              blurRadius: 20,
-              offset: const Offset(0, 8),
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Product Image
-            Expanded(
-              flex: 5,
-              child: Container(
-                decoration: BoxDecoration(
-                  image: DecorationImage(
-                    image: NetworkImage(product.images.first.url),
-                    fit: BoxFit.cover,
+      child: ClipRect(
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.06),
+                blurRadius: 20,
+                offset: const Offset(0, 8),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min, // Use minimum space needed
+            children: [
+              // Product Image
+              AspectRatio(
+                aspectRatio: 1.0, // Enforce 1:1 aspect ratio
+                child: Container(
+                  decoration: BoxDecoration(
+                    image: DecorationImage(
+                      image: NetworkImage(product.images.first.url),
+                      fit: BoxFit.cover,
+                    ),
                   ),
                 ),
               ),
-            ),
-            // Product Details
-            Container(
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Product Name
-                  Text(
-                    product.name,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w500,
-                      color: Colors.black87,
-                      height: 1.2,
+              // Product Details
+              Container(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min, // Use minimum space needed
+                  children: [
+                    // Product Name
+                    Text(
+                      product.name,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.black87,
+                        height: 1.2,
+                      ),
+                      maxLines: 2, // Allow two lines for product name
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 6),
-                  // Price
-                  Text(
-                    '${product.price.toStringAsFixed(2)} AED',
-                    style: const TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.grey,
+                    const SizedBox(height: 6),
+                    // Price
+                    Text(
+                      '${product.price.toStringAsFixed(2)} AED',
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.grey,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

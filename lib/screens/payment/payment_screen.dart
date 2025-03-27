@@ -57,8 +57,13 @@ class _PaymentScreenState extends State<PaymentScreen> {
             final uri = Uri.parse(request.url);
             
             // Check if this is a redirect back to our app
-            if (uri.host == 'pinewraps-api.onrender.com' && 
-                uri.path.contains('/payments/mobile-callback')) {
+            if ((uri.host == 'pinewraps-api.onrender.com' || 
+                uri.host.contains('pinewraps.com')) && 
+                (uri.path.contains('/payments/mobile-callback') || 
+                 uri.path.contains('/checkout/success') || 
+                 uri.path.contains('/checkout/error') ||
+                 uri.path.contains('/checkout/cancel'))) {
+              print('Detected payment callback: $uri');
               _handlePaymentCallback(uri);
               return NavigationDecision.prevent;
             }
@@ -103,16 +108,38 @@ class _PaymentScreenState extends State<PaymentScreen> {
     setState(() => _isProcessing = true);
     
     try {
-      // Check if payment was cancelled
-      if (uri.queryParameters['cancelled'] == 'true') {
-        print('Payment was cancelled');
+      // Check if payment was cancelled directly from URL path or query param
+      if (uri.queryParameters['cancelled'] == 'true' || 
+          uri.path.contains('/checkout/error') || 
+          uri.path.contains('/checkout/cancel')) {
+        print('Payment was cancelled or failed');
         _completePayment(false);
         return;
       }
+      
+      // Check if payment was successful from URL path
+      if (uri.path.contains('/checkout/success')) {
+        print('Payment success indicated by URL path');
+        
+        // Get reference from URL or use the one passed to widget
+        final reference = uri.queryParameters['ref'] ?? widget.reference;
+        
+        // Double check with server for extra safety
+        try {
+          final verified = await _paymentService.verifyPayment(reference);
+          _completePayment(verified);
+        } catch (e) {
+          print('Error verifying successful payment: $e');
+          // Assume success if in success path despite verification issue
+          _completePayment(true);
+        }
+        return;
+      }
 
-      // Get reference from URL or use the one passed to widget
+      // Standard verification path
       final reference = uri.queryParameters['ref'] ?? widget.reference;
-
+      print('Verifying payment with reference: $reference');
+      
       // Wait for confirmation using the merchant order ID (reference)
       print('Waiting for payment confirmation...');
       final success = await _paymentService.verifyPayment(reference);

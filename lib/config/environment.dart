@@ -5,25 +5,52 @@ enum Environment {
 }
 
 class EnvironmentConfig {
-  // Force production environment
-  static final Environment _environment = Environment.production;
+  // Current environment
+  static Environment _environment = Environment.production;
   
   // Base URLs for different environments
-  static const String _baseDeviceUrl = 'http://192.168.1.2:3001';
+  static const String _baseLocalUrl = 'http://localhost:3001';
+  static const String _baseLocalNetworkUrl = 'http://192.168.1.4:3001'; // Computer's IP on local network
   static const String _baseEmulatorUrl = 'http://10.0.2.2:3001';
   static const String _baseProductionUrl = 'https://pinewraps-api.onrender.com';
   
-  // Always use production URL
-  static final String _currentBaseUrl = _baseProductionUrl;
+  // Use emulator flag
+  static bool _useEmulator = false;
+  
+  // Use physical device flag
+  static bool _usePhysicalDevice = true;
 
-  // Remove ability to change environment
-  static void setEnvironment(Environment env) {
-    // Do nothing - environment is locked to production
+  // Dynamic base URL based on environment
+  static String get _currentBaseUrl {
+    switch (_environment) {
+      case Environment.development:
+        if (_useEmulator) {
+          return _baseEmulatorUrl;
+        } else if (_usePhysicalDevice) {
+          return _baseLocalNetworkUrl;
+        } else {
+          return _baseLocalUrl;
+        }
+      case Environment.staging:
+        return _baseLocalNetworkUrl;
+      case Environment.production:
+        return _baseProductionUrl;
+    }
   }
 
-  // Remove ability to switch to emulator
+  // Set environment
+  static void setEnvironment(Environment env) {
+    _environment = env;
+  }
+
+  // Toggle emulator mode
   static void useEmulator(bool useEmulator) {
-    // Do nothing - environment is locked to production
+    _useEmulator = useEmulator;
+  }
+  
+  // Toggle physical device mode
+  static void usePhysicalDevice(bool usePhysicalDevice) {
+    _usePhysicalDevice = usePhysicalDevice;
   }
 
   static String get baseUrl => _currentBaseUrl;
@@ -31,6 +58,7 @@ class EnvironmentConfig {
   static String get imageBaseUrl => '$_currentBaseUrl/images';
   static String get uploadBaseUrl => '$_currentBaseUrl/uploads';
 
-  static bool get isDevelopment => false;
-  static bool get isProduction => true;
+  static bool get isDevelopment => _environment == Environment.development;
+  static bool get isRunningInProduction => _environment == Environment.production;
+  static bool get isProduction => _environment == Environment.production;
 }

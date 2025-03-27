@@ -20,7 +20,7 @@ class CustomerDetails {
     this.birthDate,
     this.isEmailVerified = false,
     this.rewardPoints = 0,
-    this.rewardTier = 'BRONZE',  
+    this.rewardTier = 'GREEN',  
     this.imageUrl,
     this.provider,
   });
@@ -35,7 +35,7 @@ class CustomerDetails {
       birthDate: json['birthDate'] != null ? DateTime.parse(json['birthDate']) : null,
       isEmailVerified: json['isEmailVerified'] ?? false,
       rewardPoints: json['rewardPoints'] ?? 0,
-      rewardTier: json['rewardTier'] ?? 'BRONZE',
+      rewardTier: json['rewardTier'] ?? 'GREEN',
       imageUrl: json['imageUrl'],
       provider: json['provider'],
     );

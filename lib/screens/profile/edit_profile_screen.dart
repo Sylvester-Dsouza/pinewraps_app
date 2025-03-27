@@ -37,10 +37,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       print('Customer data received: ${customer.toJson()}');
       
       setState(() {
-        _firstNameController.text = customer.firstName;
-        _lastNameController.text = customer.lastName;
-        _emailController.text = customer.email;
-        _phoneController.text = customer.phone?.replaceFirst('+971', '') ?? '';
+        _firstNameController.text = customer.firstName ?? '';
+        _lastNameController.text = customer.lastName ?? '';
+        _emailController.text = customer.email ?? '';
+        _phoneController.text = customer.phone != null ? customer.phone!.replaceFirst('+971', '') : '';
         _selectedDate = customer.birthDate;
         _isLoading = false;
       });
@@ -79,21 +79,25 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     try {
       // Add +971 prefix to phone number if not already present
       String phoneNumber = _phoneController.text.trim();
-      if (!phoneNumber.isEmpty && !phoneNumber.startsWith('+971')) {
+      if (phoneNumber.isNotEmpty && !phoneNumber.startsWith('+971')) {
         phoneNumber = '+971$phoneNumber';
       }
 
-      await _apiService.updateProfile(
+      // Use AuthService instead of ApiService directly
+      final authService = AuthService();
+      final result = await authService.updateProfile(
         firstName: _firstNameController.text.trim(),
         lastName: _lastNameController.text.trim(),
         phone: phoneNumber.isEmpty ? null : phoneNumber,
-        dateOfBirth: _selectedDate?.toIso8601String(), // Add date of birth
       );
       
+      print('Profile updated successfully: $result');
+      
       if (!mounted) return;
-      Navigator.pop(context, true);
+      Navigator.pop(context, true); // Return true to indicate success
       ToastUtils.showSuccessToast('Profile updated successfully');
     } catch (e) {
+      print('Error updating profile: $e');
       if (!mounted) return;
       ToastUtils.showErrorToast('Failed to update profile: ${e.toString()}');
     } finally {

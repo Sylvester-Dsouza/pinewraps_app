@@ -25,19 +25,40 @@ class OrderDetailsScreen extends StatelessWidget {
       body: SingleChildScrollView(
         child: Column(
           children: [
-            // Order Status Timeline
+            // Order Status & Source Badge
             Container(
               color: Colors.white,
               padding: const EdgeInsets.all(16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    'Order Status',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w600,
-                    ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'Order Status',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      // Source badge
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                        decoration: BoxDecoration(
+                          color: order.source == 'POS' ? Colors.blue[100] : Colors.green[100],
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          order.source == 'POS' ? 'In-Store' : 'Online',
+                          style: TextStyle(
+                            color: order.source == 'POS' ? Colors.blue : Colors.green,
+                            fontWeight: FontWeight.w500,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 16),
                   OrderTimeline(order: order),
@@ -78,16 +99,24 @@ class OrderDetailsScreen extends StatelessWidget {
                               decoration: BoxDecoration(
                                 color: Colors.grey[100],
                                 borderRadius: BorderRadius.circular(8),
+                                image: item.image != null
+                                    ? DecorationImage(
+                                        image: NetworkImage(item.image!),
+                                        fit: BoxFit.cover,
+                                      )
+                                    : null,
                               ),
-                              child: Center(
-                                child: Text(
-                                  '${item.quantity}x',
-                                  style: const TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                              ),
+                              child: item.image == null
+                                  ? Center(
+                                      child: Text(
+                                        '${item.quantity}x',
+                                        style: const TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                    )
+                                  : null,
                             ),
                             const SizedBox(width: 12),
                             Expanded(
@@ -143,6 +172,34 @@ class OrderDetailsScreen extends StatelessWidget {
                   if (order.pointsValue > 0) _buildPriceRow('Points Redeemed', -order.pointsValue),
                   const SizedBox(height: 8),
                   _buildPriceRow('Total', order.total, isTotal: true),
+                ],
+              ),
+            ),
+            const SizedBox(height: 8),
+
+            // Order Information
+            Container(
+              color: Colors.white,
+              margin: const EdgeInsets.only(top: 8),
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Order Information',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  _buildInfoRow('Order Number', order.orderNumber),
+                  _buildInfoRow('Order Date', _formatDate(order.createdAt)),
+                  _buildInfoRow('Order Time', _formatTime(order.createdAt)),
+                  _buildInfoRow('Source', order.source == 'POS' ? 'In-Store Purchase' : 'Online Order'),
+                  _buildInfoRow('Status', order.status.label),
+                  _buildInfoRow('Payment Status', order.paymentStatus.name.replaceAll('_', ' ')),
+                  _buildInfoRow('Payment Method', order.paymentMethod),
                 ],
               ),
             ),
@@ -350,6 +407,14 @@ class OrderDetailsScreen extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  String _formatDate(DateTime date) {
+    return DateFormat('dd MMM yyyy').format(date);
+  }
+
+  String _formatTime(DateTime date) {
+    return DateFormat('hh:mm a').format(date);
   }
 
   Color _getPaymentStatusColor(PaymentStatus status) {

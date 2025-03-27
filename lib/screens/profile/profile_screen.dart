@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import '../../services/auth_service.dart';
-import '../../utils/toast_utils.dart';
 import 'address_screen.dart';
 import 'help_support_screen.dart';
 import 'edit_profile_screen.dart';
 import '../orders/order_history_screen.dart';
 import './rewards_screen.dart';
+import '../auth/login_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -29,6 +29,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     setState(() => _isLoading = true);
     try {
       final profile = await _authService.getUserProfile();
+      print('Loaded profile: $profile');
       setState(() {
         _userProfile = profile;
         _isLoading = false;
@@ -74,8 +75,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       )
                     else
                       Text(
-                        _userProfile != null
-                            ? '${_userProfile!['firstName']} ${_userProfile!['lastName']}'
+                        _userProfile != null && (_userProfile!['firstName'] != null || _userProfile!['lastName'] != null)
+                            ? '${_userProfile!['firstName'] ?? ''} ${_userProfile!['lastName'] ?? ''}'.trim()
                             : 'Guest User',
                         style: const TextStyle(
                           fontSize: 18,
@@ -84,7 +85,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ),
                     const SizedBox(height: 4),
                     Text(
-                      _userProfile != null ? _userProfile!['email'] : 'Welcome to Pinewraps',
+                      _userProfile != null && _userProfile!['email'] != null 
+                          ? _userProfile!['email'] 
+                          : 'Welcome to Pinewraps',
                       style: const TextStyle(
                         color: Colors.grey,
                       ),
@@ -95,28 +98,38 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ],
           ),
           const SizedBox(height: 16),
-          ElevatedButton(
-            onPressed: () async {
-              final result = await Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const EditProfileScreen(),
-                ),
-              );
-              if (result == true) {
-                // Refresh profile data if edit was successful
-                _loadUserProfile();
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              minimumSize: const Size.fromHeight(40),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-            ),
-            child: const Text('Edit Profile'),
-          ),
+          _buildEditProfileButton(),
         ],
+      ),
+    );
+  }
+
+  Widget _buildEditProfileButton() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: ElevatedButton(
+        onPressed: () async {
+          final result = await Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const EditProfileScreen(),
+            ),
+          );
+          
+          // Refresh profile data when returning from edit screen
+          if (result == true) {
+            _loadUserProfile();
+          }
+        },
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.black,
+          foregroundColor: Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(8),
+          ),
+          minimumSize: const Size(double.infinity, 48),
+        ),
+        child: const Text('Edit Profile'),
       ),
     );
   }
@@ -239,9 +252,51 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   title: const Text('Logout', style: TextStyle(color: Colors.red)),
                   trailing: const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.red),
                   onTap: () async {
-                    final authService = AuthService();
-                    await authService.signOut();
-                    // No need to navigate as auth state listener will handle it
+                    // Show confirmation dialog
+                    final shouldLogout = await showDialog<bool>(
+                      context: context,
+                      builder: (context) => AlertDialog(
+                        title: const Text('Confirm Logout'),
+                        content: const Text('Are you sure you want to logout?'),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(context, false),
+                            child: const Text('Cancel'),
+                          ),
+                          TextButton(
+                            onPressed: () => Navigator.pop(context, true),
+                            style: TextButton.styleFrom(
+                              foregroundColor: Colors.red,
+                            ),
+                            child: const Text('Logout'),
+                          ),
+                        ],
+                      ),
+                    );
+
+                    if (shouldLogout == true) {
+                      try {
+                        await AuthService().signOut();
+                        if (context.mounted) {
+                          Navigator.pushAndRemoveUntil(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const LoginScreen(),
+                            ),
+                            (route) => false,
+                          );
+                        }
+                      } catch (e) {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Error logging out. Please try again.'),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                        }
+                      }
+                    }
                   },
                 ),
                 const SizedBox(height: 20),

@@ -124,7 +124,7 @@ class PaymentService {
           // If still pending and not last attempt, wait and retry
           if (i < maxRetries - 1) {
             print('Payment still pending, waiting ${retryDelay}s before retry ${i + 2}/$maxRetries');
-            await Future.delayed(Duration(seconds: retryDelay));
+            await Future.delayed(const Duration(seconds: retryDelay));
           }
         }
       }
@@ -138,7 +138,7 @@ class PaymentService {
   }
 
   Future<bool> waitForPaymentCompletion(String reference) async {
-    final maxAttempts = 60; // 5 minutes with 5-second intervals
+    const maxAttempts = 60; // 5 minutes with 5-second intervals
     var attempts = 0;
 
     while (attempts < maxAttempts) {

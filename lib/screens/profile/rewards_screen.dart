@@ -65,6 +65,12 @@ class _RewardsScreenState extends State<RewardsScreen> {
               children: [
                 // Points Summary
                 Card(
+                  elevation: 1,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    side: BorderSide(color: Colors.grey.shade200),
+                  ),
+                  color: Colors.white,
                   child: Padding(
                     padding: const EdgeInsets.all(16),
                     child: Column(

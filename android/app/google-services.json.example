@@ -1,38 +1,54 @@
 {
   "project_info": {
-    "project_number": "YOUR_PROJECT_NUMBER",
-    "project_id": "YOUR_PROJECT_ID",
-    "storage_bucket": "YOUR_STORAGE_BUCKET"
+    "project_number": "181991178384",
+    "project_id": "pinewraps-23e8a",
+    "storage_bucket": "pinewraps-23e8a.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "YOUR_MOBILE_SDK_APP_ID",
+        "mobilesdk_app_id": "1:181991178384:android:a5699293807394f7485815",
         "android_client_info": {
           "package_name": "com.pinewraps.app"
         }
       },
       "oauth_client": [
         {
-          "client_id": "YOUR_CLIENT_ID",
+          "client_id": "181991178384-egso4atj877ghd4c2tgiv9rg2c15715o.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.pinewraps.app",
+            "certificate_hash": "36cee120eaaec671fe14f945545cb9f027204274"
+          }
+        },
+        {
+          "client_id": "181991178384-14b6ot78n01e3dn8k6njfr23bl5ld65m.apps.googleusercontent.com",
           "client_type": 3
         }
       ],
       "api_key": [
         {
-          "current_key": "YOUR_API_KEY"
+          "current_key": "AIzaSyBYspB4HlxdCC6qLcpmiTjaEaiRiDcq16A"
         }
       ],
       "services": {
         "appinvite_service": {
           "other_platform_oauth_client": [
             {
-              "client_id": "YOUR_CLIENT_ID",
+              "client_id": "181991178384-14b6ot78n01e3dn8k6njfr23bl5ld65m.apps.googleusercontent.com",
               "client_type": 3
+            },
+            {
+              "client_id": "181991178384-0768pbr5j4b0svq374ql8jmqm8lha5gi.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.pinewraps.app"
+              }
             }
           ]
         }
       }
     }
-  ]
+  ],
+  "configuration_version": "1"
 }

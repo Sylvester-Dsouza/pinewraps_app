@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import '../home/home_screen.dart';
+import '../../main.dart';
 import '../auth/login_screen.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -41,7 +41,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
     
     Navigator.of(context).pushReplacement(
       MaterialPageRoute(
-        builder: (context) => user != null ? const HomeScreen() : const LoginScreen(),
+        builder: (context) => user != null ? const MainScreen() : const LoginScreen(),
       ),
     );
   }
@@ -71,23 +71,15 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
               ),
               const SizedBox(height: 20),
               // App Name
-              const Text(
-                'Pinewraps',
-                style: TextStyle(
-                  fontSize: 32,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black,
-                ),
-              ),
+              // const Text(
+              //   'Pine Wraps',
+              //   style: TextStyle(
+              //     fontSize: 32,
+              //     fontWeight: FontWeight.bold,
+              //     color: Colors.black,
+              //   ),
+              // ),
               const SizedBox(height: 10),
-              // Tagline
-              const Text(
-                'Delicious Cakes & Treats',
-                style: TextStyle(
-                  fontSize: 16,
-                  color: Colors.grey,
-                ),
-              ),
             ],
           ),
         ),

@@ -35,6 +35,22 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
+  void _showSuccess(String message) {
+    if (!mounted) return;
+    
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.green,
+        behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.all(16),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(10),
+        ),
+      ),
+    );
+  }
+
   Future<void> _signInWithEmailPassword() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -44,22 +60,63 @@ class _LoginScreenState extends State<LoginScreen> {
     });
 
     try {
+      // Attempt to sign in
       await _authService.signInWithEmailPassword(
-        _emailController.text,
+        _emailController.text.trim(),
         _passwordController.text,
       );
-      
+
+      // Make sure we have the latest auth state
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        throw FirebaseAuthException(
+          code: 'user-not-found',
+          message: 'Login failed. Please try again.',
+        );
+      }
+
       if (mounted) {
+        _showSuccess('Login successful! Welcome back.');
+        
+        // Wait a moment to show the success message
+        await Future.delayed(const Duration(milliseconds: 500));
+        
         // Navigate to main screen and remove all previous routes
-        Navigator.of(context).pushAndRemoveUntil(
+        Navigator.of(context).pushReplacement(
           MaterialPageRoute(builder: (context) => const MainScreen()),
-          (route) => false,
         );
       }
     } on FirebaseAuthException catch (e) {
-      _showError(e.message ?? 'An error occurred');
+      print('Firebase Auth Error: ${e.message}');
+      String errorMessage = 'An error occurred during login';
+      
+      switch (e.code) {
+        case 'user-not-found':
+          errorMessage = 'No user found with this email';
+          break;
+        case 'wrong-password':
+          errorMessage = 'Invalid password';
+          break;
+        case 'invalid-email':
+          errorMessage = 'Invalid email address';
+          break;
+        case 'user-disabled':
+          errorMessage = 'This account has been disabled';
+          break;
+        default:
+          errorMessage = e.message ?? 'Login failed. Please try again.';
+      }
+      
+      _showError(errorMessage);
     } catch (e) {
-      _showError('An unexpected error occurred');
+      print('Login Error: $e');
+      _showError('An unexpected error occurred. Please try again.');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -70,12 +127,31 @@ class _LoginScreenState extends State<LoginScreen> {
     });
 
     try {
+      // Show loading indicator for social login
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Signing in with Google...'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+      
       // Start Google Sign In process
+      print('Starting Google sign-in process');
       final googleUser = await _authService.startGoogleSignIn();
+      
       if (googleUser != null && mounted) {
+        // Show loading indicator for backend sync
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Completing sign-in...'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+        
         // Complete the backend sync and wait for it
+        print('Completing backend sync for user: ${googleUser.email}');
         final result = await _authService.completeGoogleSignIn(googleUser);
-        print('Backend sync completed: $result'); // Debug log
+        print('Backend sync completed successfully');
         
         if (result.isEmpty) {
           throw ApiException(
@@ -85,13 +161,21 @@ class _LoginScreenState extends State<LoginScreen> {
         }
 
         if (mounted) {
+          // Show success message
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Sign in successful!'),
+              backgroundColor: Colors.green,
+            ),
+          );
+          
           // Navigate to main screen and remove all previous routes
-          Navigator.of(context).pushAndRemoveUntil(
+          Navigator.of(context).pushReplacement(
             MaterialPageRoute(builder: (context) => const MainScreen()),
-            (route) => false,
           );
         }
       } else {
+        print('Google sign-in was cancelled or returned null');
         throw ApiException(
           message: 'Google sign in was cancelled',
           statusCode: 401,
@@ -100,10 +184,46 @@ class _LoginScreenState extends State<LoginScreen> {
     } catch (e) {
       print('Google Sign In Error: $e'); // Debug log
       String errorMessage = 'Failed to sign in with Google';
+      
       if (e is ApiException) {
         errorMessage = e.message;
+        print('API Exception: ${e.message} (${e.statusCode})');
+      } else if (e is FirebaseAuthException) {
+        // Handle specific Firebase auth errors
+        switch (e.code) {
+          case 'account-exists-with-different-credential':
+            errorMessage = 'An account already exists with the same email address but different sign-in credentials';
+            break;
+          case 'invalid-credential':
+            errorMessage = 'Invalid credentials';
+            break;
+          case 'operation-not-allowed':
+            errorMessage = 'Google sign-in is not enabled for this project';
+            break;
+          case 'user-disabled':
+            errorMessage = 'Your account has been disabled';
+            break;
+          case 'user-not-found':
+          case 'wrong-password':
+            errorMessage = 'Invalid login credentials';
+            break;
+          default:
+            errorMessage = e.message ?? 'An error occurred during sign in';
+        }
+      } else {
+        print('Unknown error: $e');
       }
+      
       _showError(errorMessage);
+      
+      // Additional user feedback
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Sign in failed: $errorMessage'),
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 4),
+        ),
+      );
     } finally {
       if (mounted) {
         setState(() {
@@ -123,11 +243,10 @@ class _LoginScreenState extends State<LoginScreen> {
       final result = await _authService.signInWithApple();
       print('Apple sign in result: $result'); // Debug log
       
-      if (result != null && mounted) {
+      if (mounted) {
         // Navigate to main screen and remove all previous routes
-        Navigator.of(context).pushAndRemoveUntil(
+        Navigator.of(context).pushReplacement(
           MaterialPageRoute(builder: (context) => const MainScreen()),
-          (route) => false,
         );
       }
     } catch (e) {
@@ -236,8 +355,8 @@ class _LoginScreenState extends State<LoginScreen> {
                     : Text('Login', style: AuthStyles.buttonTextStyle),
                 ),
                 const SizedBox(height: 16),
-                Row(
-                  children: const [
+                const Row(
+                  children: [
                     Expanded(child: Divider()),
                     Padding(
                       padding: EdgeInsets.symmetric(horizontal: 16),
@@ -293,7 +412,13 @@ class _LoginScreenState extends State<LoginScreen> {
                   onPressed: () {
                     Navigator.pushNamed(context, '/forgot-password');
                   },
-                  child: const Text('Forgot Password?'),
+                  child: const Text(
+                    'Forgot Password?',
+                    style: TextStyle(
+                      color: Colors.black,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
                 ),
               ],
             ),

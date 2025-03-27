@@ -21,6 +21,7 @@ class AddressCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
+      color: Colors.white,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
       ),
@@ -74,7 +75,7 @@ class AddressCard extends StatelessWidget {
                                 TextButton(
                                   onPressed: () => Navigator.pop(context, true),
                                   style: TextButton.styleFrom(
-                                    foregroundColor: Colors.red,
+                                    foregroundColor: Colors.white,
                                   ),
                                   child: const Text('Delete'),
                                 ),
@@ -118,13 +119,13 @@ class AddressCard extends StatelessWidget {
                           children: [
                             Icon(
                               Icons.delete_outline,
-                              color: Colors.red,
+                              color: Colors.black,
                             ),
                             SizedBox(width: 8),
                             Text(
                               'Delete',
                               style: TextStyle(
-                                color: Colors.red,
+                                color: Colors.black,
                               ),
                             ),
                           ],

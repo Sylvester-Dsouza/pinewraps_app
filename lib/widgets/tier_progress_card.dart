@@ -38,7 +38,11 @@ class TierProgressCard extends StatelessWidget {
                     vertical: 6,
                   ),
                   decoration: BoxDecoration(
-                    color: getTierColor(currentTier).withOpacity(0.1),
+                    color: Colors.white,
+                    border: Border.all(
+                      color: getTierColor(currentTier),
+                      width: 1,
+                    ),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(

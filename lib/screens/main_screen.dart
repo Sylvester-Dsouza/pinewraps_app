@@ -4,14 +4,15 @@ import 'shop/shop_screen.dart';
 import 'profile/profile_screen.dart';
 import 'cart/cart_screen.dart';
 import '../services/cart_service.dart';
-import '../models/cart_item.dart';
 
 class MainScreen extends StatefulWidget {
   final int initialIndex;
+  final String? shopCategory;
   
   const MainScreen({
     super.key,
     this.initialIndex = 0,
+    this.shopCategory,
   });
 
   @override
@@ -53,11 +54,11 @@ class _MainScreenState extends State<MainScreen> {
     return Scaffold(
       body: IndexedStack(
         index: _selectedIndex,
-        children: const [
-          HomeScreen(),
-          ShopScreen(),
-          CartScreen(),
-          ProfileScreen(),
+        children: [
+          const HomeScreen(),
+          ShopScreen(initialCategory: widget.shopCategory),
+          const CartScreen(),
+          const ProfileScreen(),
         ],
       ),
       bottomNavigationBar: BottomNavigationBar(

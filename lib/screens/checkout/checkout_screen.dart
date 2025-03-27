@@ -53,12 +53,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   bool _lastNameReadOnly = false;
   bool _emailReadOnly = false;
   bool _phoneReadOnly = false;
-  bool _streetReadOnly = false;
-  bool _apartmentReadOnly = false;
-  bool _cityReadOnly = false;
-  bool _pincodeReadOnly = false;
+  final bool _streetReadOnly = false;
+  final bool _apartmentReadOnly = false;
+  final bool _cityReadOnly = false;
+  final bool _pincodeReadOnly = false;
   
-  // UAE Emirates
+  // UAE Emirates with proper formatting for both UI display and backend compatibility
   final List<String> _emirates = [
     'Abu Dhabi',
     'Dubai',
@@ -68,7 +68,19 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     'Ras Al Khaimah',
     'Fujairah',
   ];
-  String? _selectedEmirate;
+
+  // Backend format for emirates (used for API calls)
+  final Map<String, String> _backendEmirates = {
+    'Abu Dhabi': 'ABU_DHABI',
+    'Dubai': 'DUBAI',
+    'Sharjah': 'SHARJAH',
+    'Ajman': 'AJMAN',
+    'Umm Al Quwain': 'UMM_AL_QUWAIN',
+    'Ras Al Khaimah': 'RAS_AL_KHAIMAH',
+    'Fujairah': 'FUJAIRAH',
+  };
+  
+  String? _selectedEmirate; // For UI display
   double _deliveryCharge = 0;
   
   // Define emirates list and their corresponding time slots
@@ -175,6 +187,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     _loadCustomerDetails();
     _phoneReadOnly = false; // Make phone number always editable
     _calculateTotal(); // Initialize total on startup
+    
+    // Initialize emirate with a valid value from the _emirates list
+    _selectedEmirate = _emirates[1]; // Dubai is at index 1
+    
     // Initialize recipient phone with UAE country code
     _giftRecipientPhoneController.text = '+971 ';
   }
@@ -359,9 +375,26 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       initialDate: firstDate,
       firstDate: firstDate,
       lastDate: lastDate,
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: ColorScheme.light(
+              primary: Colors.grey[800]!, // header background
+              onPrimary: Colors.white, // header text
+              onSurface: Colors.black87, // calendar text
+            ),
+            textButtonTheme: TextButtonThemeData(
+              style: TextButton.styleFrom(
+                foregroundColor: Colors.grey[800], // button text color
+              ),
+            ),
+          ),
+          child: child!,
+        );
+      },
     );
 
-    if (picked != null) {
+    if (picked != null && mounted) {
       setState(() {
         _selectedDate = picked;
         _selectedTimeSlot = null;  // Reset time slot when date changes
@@ -370,38 +403,61 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   List<String> _getAvailableTimeSlots() {
-    if (_selectedDate == null) return [];
-    
     final now = DateTime.now();
-    final today = DateTime(_selectedDate!.year, _selectedDate!.month, _selectedDate!.day);
-    final isToday = today.isAtSameMomentAs(DateTime(now.year, now.month, now.day));
-    final isTomorrow = today.isAtSameMomentAs(
-      DateTime(now.year, now.month, now.day).add(const Duration(days: 1))
-    );
+    final selectedDate = _selectedDate;
+    
+    if (selectedDate == null) return [];
+    
+    final isToday = selectedDate.year == now.year && 
+                   selectedDate.month == now.month && 
+                   selectedDate.day == now.day;
+    
+    final isTomorrow = selectedDate.year == now.year && 
+                       selectedDate.month == now.month && 
+                       selectedDate.day == now.day + 1;
     
     if (_selectedDeliveryMethod == DeliveryMethod.storePickup) {
-      if (!isToday) return _pickupTimeSlots;
+      // For store pickup, use fixed time slots
+      
+      // If not today, return all time slots
+      if (!isToday) {
+        return List.from(_pickupTimeSlots);
+      }
       
       // For same day pickup, filter slots based on current time + 3 hours buffer
       final currentHour = now.hour;
       return _pickupTimeSlots.where((slot) {
-        final slotHour = int.parse(slot.split(':')[0].trim());
-        if (slot.contains('PM') && slotHour != 12) {
-          return (slotHour + 12) > currentHour + 3;
-        } else if (slot.contains('AM') || slotHour == 12) {
-          return slotHour > currentHour + 3;
+        final slotParts = slot.split(':');
+        int slotHour = int.parse(slotParts[0].trim());
+        final isPM = slot.toLowerCase().contains('pm');
+        
+        // Convert to 24-hour format
+        if (isPM && slotHour != 12) {
+          slotHour += 12;
+        } else if (!isPM && slotHour == 12) {
+          slotHour = 0;
         }
-        return false;
+        
+        // Slot is available if it's at least 3 hours from now
+        return slotHour > (currentHour + 3);
       }).toList();
     } else {
       // For delivery, use emirate-specific slots
-      if (_selectedEmirate == null) return [];
+      final currentEmirate = _selectedEmirate ?? _emirates[1]; // Default to Dubai
+      
+      // Find the matching key in _deliveryTimeSlots
+      final emirateKey = _deliveryTimeSlots.keys.firstWhere(
+        (key) => key.toUpperCase() == currentEmirate.toUpperCase(),
+        orElse: () => _emirates[1], // Default to Dubai
+      );
+      
+      if (_deliveryTimeSlots[emirateKey] == null) return [];
 
       final currentHour = now.hour;
       final currentMinute = now.minute;
       final currentTime = currentHour * 60 + currentMinute; // Convert to minutes
 
-      return _deliveryTimeSlots[_selectedEmirate]!
+      return _deliveryTimeSlots[emirateKey]!
           .where((slot) {
             final cutoffParts = slot['cutoff'].split(':');
             final cutoffHour = int.parse(cutoffParts[0]);
@@ -519,12 +575,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         return;
       }
 
-      // Step 2: Validate Delivery/Pickup Information
-      if (_selectedDeliveryMethod == null) {
-        _showMessage('Please select a delivery method', isError: true);
-        return;
-      }
-
       if (_selectedDeliveryMethod == DeliveryMethod.standardDelivery) {
         if (_selectedEmirate == null || _selectedEmirate!.isEmpty) {
           _showMessage('Please select an emirate for delivery', isError: true);
@@ -573,24 +623,64 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
       // Step 5: Handle Response
       if (response.statusCode == 200 || response.statusCode == 201) {
-        if (response.data == null || 
-            (response.data['data'] == null && response.data['id'] == null)) {
-          throw Exception('Invalid response from server');
+        print('Success response data: ${json.encode(response.data)}');
+        
+        if (response.data == null) {
+          throw Exception('Empty response from server');
         }
-
+        
         String? orderId;
-        if (response.data['data'] != null && response.data['data']['id'] != null) {
-          orderId = response.data['data']['id'].toString();
-        } else if (response.data['id'] != null) {
+        String? paymentUrl;
+        
+        // Extract data from response using different possible paths
+        if (response.data['data'] != null) {
+          var data = response.data['data'];
+          
+          // Check for order in data
+          if (data['order'] != null && data['order'] is Map) {
+            orderId = data['order']['id']?.toString();
+          }
+          // Check for direct id in data
+          else if (data['id'] != null) {
+            orderId = data['id'].toString();
+          }
+          
+          // Check for payment URL in data
+          if (data['paymentUrl'] != null) {
+            paymentUrl = data['paymentUrl'].toString();
+          }
+        }
+        // Check for direct order in response
+        else if (response.data['order'] != null && response.data['order'] is Map) {
+          orderId = response.data['order']['id']?.toString();
+        }
+        // Check for direct id in response
+        else if (response.data['id'] != null) {
           orderId = response.data['id'].toString();
         }
-
-        if (orderId == null || orderId.isEmpty) {
-          throw Exception('No order ID received from server');
+        
+        // Check for payment URL directly in response
+        if (paymentUrl == null && response.data['paymentUrl'] != null) {
+          paymentUrl = response.data['paymentUrl'].toString();
         }
-
-        // Step 6: Process Payment
-        await _processPayment(orderId);
+        
+        print('Extracted order ID: $orderId');
+        print('Extracted payment URL: $paymentUrl');
+        
+        // If we have a payment URL but no order ID, use the payment URL directly
+        if ((orderId == null || orderId.isEmpty) && paymentUrl != null && paymentUrl.isNotEmpty) {
+          print('Using payment URL directly: $paymentUrl');
+          await _navigateToPaymentWebView(paymentUrl);
+          return;
+        }
+        
+        // If we have an order ID, process payment
+        if (orderId != null && orderId.isNotEmpty) {
+          await _processPayment(orderId);
+          return;
+        }
+        
+        throw Exception('Could not extract order ID or payment URL from response: ${json.encode(response.data)}');
       } else {
         throw Exception(response.data['error']?.toString() ?? 
                        response.data['message']?.toString() ?? 
@@ -689,107 +779,142 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     }
   }
 
+  Future<void> _navigateToPaymentWebView(String paymentUrl) async {
+    try {
+      if (!mounted) return;
+      
+      // Generate a unique reference for this payment
+      final reference = 'direct_${DateTime.now().millisecondsSinceEpoch}';
+      
+      final paymentResult = await Navigator.push<bool>(
+        context,
+        MaterialPageRoute(
+          builder: (context) => PaymentScreen(
+            paymentUrl: paymentUrl,
+            orderId: 'pending', // Order ID will be assigned after payment
+            reference: reference,
+            onPaymentComplete: (success) {
+              if (success) {
+                // Clear cart and show success message
+                _cartService.clearCart();
+                Navigator.pushNamedAndRemoveUntil(
+                  context,
+                  '/orders',
+                  (route) => false,
+                );
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Payment failed. Please try again.'),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+              }
+            },
+          ),
+        ),
+      );
+
+      if (paymentResult == false) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Payment was cancelled. Please try again.'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      print('Error navigating to payment: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to open payment page: ${e.toString()}'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      setState(() => _isLoading = false);
+    }
+  }
+
   Map<String, dynamic> _buildOrderData() {
-    final idempotencyKey = DateTime.now().millisecondsSinceEpoch.toString();
-    
-    // Calculate delivery charge
-    final deliveryCharge = _selectedDeliveryMethod == DeliveryMethod.standardDelivery ? 
-        ((_selectedEmirate ?? 'Dubai').toUpperCase() == 'DUBAI' ? 30 : 50) : 0;
+    final subtotal = _calculateSubTotal();
+    final total = _calculateTotal();
 
-    // Calculate total including delivery charge
-    final subtotal = _calculateSubTotal().round();
-    final total = subtotal + deliveryCharge;
-
-    // Format today's date for pickup/delivery in UTC
-    final now = DateTime.now().toUtc();
-    final formattedDate = "${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}";
-
-    // Convert time slot to 24-hour format
+    // Format time slot to 24-hour format
     String formatTimeSlot(String? timeSlot) {
       if (timeSlot == null) return '';
-      // Convert 12-hour format to 24-hour format
-      final parts = timeSlot.split(':');
+      
+      // Parse the time slot (e.g., "5:00 PM")
+      final parts = timeSlot.split(' ');
       if (parts.length != 2) return timeSlot;
       
-      int hour = int.tryParse(parts[0]) ?? 0;
-      final isPM = timeSlot.toLowerCase().contains('pm');
+      final timeParts = parts[0].split(':');
+      if (timeParts.length != 2) return timeSlot;
+      
+      int hour = int.tryParse(timeParts[0]) ?? 0;
+      final minutes = timeParts[1];
+      final isPM = parts[1].toUpperCase() == 'PM';
+      
       if (isPM && hour != 12) hour += 12;
       if (!isPM && hour == 12) hour = 0;
       
-      return '${hour.toString().padLeft(2, '0')}:${parts[1].split(' ')[0]}';
+      return '${hour.toString().padLeft(2, '0')}:$minutes';
     }
 
-    final items = widget.cartItems.map((item) => {
-      'name': item.product.name,
-      'variant': item.selectedSize?.toUpperCase() ?? 'REGULAR',
-      'price': item.price.round(),
-      'quantity': item.quantity,
-      'cakeWriting': item.cakeText ?? '',
-    }).toList();
+    // Calculate delivery charge based on emirate
+    final isDelivery = _selectedDeliveryMethod == DeliveryMethod.standardDelivery;
+    final selectedEmirate = _selectedEmirate;
+    final deliveryCharge = isDelivery ? 
+        (_backendEmirates[selectedEmirate] == 'DUBAI' ? 30 : 50) : 0;
 
-    final orderData = {
+    return {
       'firstName': _firstNameController.text.trim(),
       'lastName': _lastNameController.text.trim(),
-      'email': _emailController.text.trim().toLowerCase(),
+      'email': _emailController.text.trim(),
       'phone': _phoneController.text.trim(),
-      'idempotencyKey': idempotencyKey,
-      'deliveryMethod': _selectedDeliveryMethod == DeliveryMethod.standardDelivery ? 'DELIVERY' : 'PICKUP',
-      'emirate': (_selectedEmirate ?? 'Dubai').toUpperCase().replaceAll(' ', '_'),
-      'deliveryCharge': deliveryCharge,
-      'items': items,
-      'subtotal': subtotal,
-      'total': total,
+      'idempotencyKey': DateTime.now().millisecondsSinceEpoch.toString(),
+      'deliveryMethod': _selectedDeliveryMethod == DeliveryMethod.storePickup ? 'PICKUP' : 'DELIVERY',
+      'items': widget.cartItems.map((item) => {
+        'name': item.product.name,
+        'variant': ((item.selectedSize?.isNotEmpty == true ? item.selectedSize : 
+                  item.selectedFlavour?.isNotEmpty == true ? item.selectedFlavour : '') ?? '')
+                  .toUpperCase(),
+        'price': item.totalPrice.floor(),
+        'quantity': item.quantity,
+        'cakeWriting': item.cakeText ?? '',
+      }).toList(),
+      'subtotal': subtotal.floor(),
+      'total': total.floor(),
       'paymentMethod': 'CREDIT_CARD',
       'isGift': _isGift,
-      'giftMessage': _isGift ? _giftMessageController.text.trim() : null,
-      'giftRecipientName': _isGift ? _giftRecipientNameController.text.trim() : null,
-      'giftRecipientPhone': _isGift ? _giftRecipientPhoneController.text.trim() : null,
-      'pointsRedeemed': _isPointsRedeemed ? (int.tryParse(pointsController.text) ?? 0) : 0,
-      'pointsValue': _isPointsRedeemed ? _calculatePointsDiscount().round() : 0,
-    };
-
-    if (_selectedDeliveryMethod == DeliveryMethod.standardDelivery) {
-      orderData.addAll({
+      'emirate': _selectedEmirate != null ? _backendEmirates[_selectedEmirate] : null, // Always include emirate
+      'deliveryCharge': deliveryCharge, // Always include deliveryCharge
+      if (_isGift) ...{
+        'giftMessage': _giftMessageController.text.trim(),
+        'giftRecipientName': _giftRecipientNameController.text.trim(),
+        'giftRecipientPhone': _giftRecipientPhoneController.text.trim(),
+      },
+      'pointsRedeemed': _isPointsRedeemed ? int.tryParse(pointsController.text) ?? 0 : 0,
+      if (_selectedDeliveryMethod == DeliveryMethod.standardDelivery) ...{
         'streetAddress': _streetController.text.trim(),
         'apartment': _apartmentController.text.trim(),
         'city': _cityController.text.trim(),
         'pincode': _pincodeController.text.trim(),
-        'deliveryDate': formattedDate,
-        'deliveryTimeSlot': formatTimeSlot(_selectedTimeSlot),
+        'deliveryDate': _selectedDate?.toIso8601String().split('T')[0],
+        'deliveryTimeSlot': _selectedTimeSlot != null ? formatTimeSlot(_selectedTimeSlot) : null,
         'deliveryInstructions': _deliveryInstructionsController.text.trim(),
-        'pickupDate': null,
-        'pickupTimeSlot': null,
-        'storeLocation': null,
-      });
-    } else {
-      orderData.addAll({
-        'streetAddress': null,
-        'apartment': null,
-        'city': null,
-        'pincode': null,
-        'deliveryDate': null,
-        'deliveryTimeSlot': null,
-        'deliveryInstructions': null,
-        'pickupDate': formattedDate,
-        'pickupTimeSlot': formatTimeSlot(_selectedTimeSlot),
+      } else ...{
+        'streetAddress': '', // Add empty strings for required fields
+        'apartment': '',
+        'city': '',
+        'pincode': '',
+        'pickupDate': _selectedDate?.toIso8601String().split('T')[0],
+        'pickupTimeSlot': _selectedTimeSlot != null ? formatTimeSlot(_selectedTimeSlot) : null,
         'storeLocation': 'Dubai Main Store',
-      });
-    }
-
-    if (_isCouponApplied && _appliedCouponCode != null) {
-      orderData.addAll({
-        'couponCode': _appliedCouponCode,
-        'couponDiscount': _couponDiscount.round(),
-      });
-    } else {
-      orderData.addAll({
-        'couponCode': null,
-        'couponDiscount': 0,
-      });
-    }
-
-    print('Sending order data: ${json.encode(orderData)}');
-    return orderData;
+      },
+      if (_couponController.text.isNotEmpty) 'couponCode': _couponController.text,
+    };
   }
 
   void _showMessage(String message, {bool isError = false}) {
@@ -874,7 +999,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       width: double.infinity,
       padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
       decoration: BoxDecoration(
-        color: Colors.grey[100],
+        color: Colors.grey[50],
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: Colors.grey[300]!),
       ),
@@ -884,7 +1009,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             width: 4,
             height: 24,
             decoration: BoxDecoration(
-              color: Colors.black87,
+              color: Colors.grey[800],
               borderRadius: BorderRadius.circular(2),
             ),
           ),
@@ -1063,7 +1188,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         borderRadius: BorderRadius.circular(12),
         onTap: () => setState(() {
           _selectedDeliveryMethod = method;
-          _selectedTimeSlot = null;
+          _selectedTimeSlot = null;  // Reset time slot when delivery method changes
         }),
         child: Container(
           padding: const EdgeInsets.all(16),
@@ -1107,7 +1232,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 groupValue: _selectedDeliveryMethod,
                 onChanged: (value) => setState(() {
                   _selectedDeliveryMethod = value!;
-                  _selectedTimeSlot = null;
+                  _selectedTimeSlot = null;  // Reset time slot when delivery method changes
                 }),
                 activeColor: Colors.black87,
               ),
@@ -1147,7 +1272,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         ),
         const SizedBox(height: 16),
         DropdownButtonFormField<String>(
-          value: _selectedEmirate,
+          value: _selectedEmirate, // Set initial value
           decoration: const InputDecoration(
             labelText: 'Emirate',
             border: OutlineInputBorder(),
@@ -1160,7 +1285,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           }).toList(),
           onChanged: (value) {
             setState(() {
-              _selectedEmirate = value;
+              _selectedEmirate = value ?? _emirates.first; // Use the exact value from the list
               _updateDeliveryCharge();
             });
           },
@@ -1190,20 +1315,48 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     _streetController.text = address.street;
     _apartmentController.text = address.apartment ?? '';
     _cityController.text = address.city;
-    _selectedEmirate = address.emirate;
+    
+    // Set selected emirate by finding matching value in _emirates list
+    final addressEmirate = address.emirate;
+    // Find the UI display emirate that matches the backend format
+    String? displayEmirate;
+    for (var entry in _backendEmirates.entries) {
+      if (entry.value == addressEmirate || 
+          entry.value.toUpperCase() == addressEmirate.toUpperCase()) {
+        displayEmirate = entry.key;
+        break;
+      }
+    }
+    
+    if (displayEmirate != null && _emirates.contains(displayEmirate)) {
+      _selectedEmirate = displayEmirate;
+    } else {
+      _selectedEmirate = 'Dubai'; // Default to Dubai
+    }
+      
     _pincodeController.text = address.pincode ?? '';
   }
 
   void _updateDeliveryCharge() {
-    setState(() {
-      if (_selectedDeliveryMethod == DeliveryMethod.standardDelivery && _selectedEmirate != null) {
-        // Dubai: 30 AED, All other emirates: 50 AED
-        _deliveryCharge = ((_selectedEmirate ?? 'Dubai').toUpperCase() == 'DUBAI' ? 30.0 : 50.0);
-      } else {
+    if (_selectedDeliveryMethod == DeliveryMethod.standardDelivery) {
+      final selectedEmirate = _selectedEmirate;
+      // Set delivery charge based on emirate
+      setState(() {
+        if (selectedEmirate == null) {
+          _deliveryCharge = 30; // Default to Dubai charge
+        } else if (_backendEmirates[selectedEmirate] == 'DUBAI') { // Use display name
+          _deliveryCharge = 30;
+        } else {
+          _deliveryCharge = 50;
+        }
+      });
+    } else {
+      setState(() {
         _deliveryCharge = 0;
-      }
-      _calculateTotal(); // Recalculate total when delivery charge changes
-    });
+      });
+    }
+    // Recalculate total
+    _calculateTotal();
   }
 
   Widget _buildTimeSlotSelector() {
@@ -1283,7 +1436,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           ),
         const SizedBox(height: 16),
         DropdownButtonFormField<String>(
-          value: _selectedTimeSlot,
+          value: _selectedTimeSlot, // Set initial value
           decoration: InputDecoration(
             labelText: _selectedDeliveryMethod == DeliveryMethod.storePickup
                 ? 'Select Pickup Time'
@@ -1345,7 +1498,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: Colors.grey[50],
             borderRadius: BorderRadius.circular(12),
             border: Border.all(color: Colors.grey[300]!),
           ),
@@ -1421,7 +1574,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   Widget _buildRewardPointsSection() {
     // Calculate points to be earned based on tier rate
-    double pointRate = 0.07; // Default BRONZE tier rate
+    double pointRate = 0.07; // Default GREEN tier rate
     if (_customerDetails != null) {
       switch (_customerDetails!.rewardTier) {
         case 'PLATINUM':
@@ -1434,19 +1587,19 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           pointRate = 0.12; // 12%
           break;
         default:
-          pointRate = 0.07; // BRONZE (7%)
+          pointRate = 0.07; // GREEN (7%)
       }
     }
     
     // Calculate points based on total before any discounts (includes delivery)
-    // For example: 100 AED * 0.07 = 7 points for BRONZE tier
+    // For example: 100 AED * 0.07 = 7 points for GREEN tier
     int pointsToEarn = (_calculateTotalBeforeDiscounts() * pointRate).floor();
     
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Colors.grey[50],
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: Colors.grey[300]!),
       ),
@@ -1734,7 +1887,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Colors.grey[50],
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: Colors.grey[300]!),
       ),

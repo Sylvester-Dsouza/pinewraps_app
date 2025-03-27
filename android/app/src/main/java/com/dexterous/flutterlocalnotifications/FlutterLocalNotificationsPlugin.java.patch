@@ -1,0 +1,11 @@
+--- FlutterLocalNotificationsPlugin.java.orig
++++ FlutterLocalNotificationsPlugin.java
+@@ -1016,7 +1016,7 @@
+       BigPictureStyle bigPictureStyle = new BigPictureStyle();
+       bigPictureStyle.bigPicture(bitmap);
+       if (!Boolean.TRUE.equals(showThumbnailWithBigPicture)) {
+-        bigPictureStyle.bigLargeIcon(null);
++        // bigPictureStyle.bigLargeIcon(null); // Commented out to fix ambiguous method reference
+       }
+       if (contentTitle != null) {
+         bigPictureStyle.setBigContentTitle(contentTitle);

@@ -29,13 +29,13 @@ Color getTierColor(RewardTier tier) {
 String getTierBenefits(RewardTier tier) {
   switch (tier) {
     case RewardTier.GREEN:
-      return 'Earn 1 point for every \$1 spent';
+      return 'Earn  point for every spent';
     case RewardTier.SILVER:
-      return 'Earn 1.5 points for every \$1 spent + Free shipping on orders over \$50';
+      return 'Earn  point for every spent';
     case RewardTier.GOLD:
-      return 'Earn 2 points for every \$1 spent + Free shipping on all orders';
+      return 'Earn  point for every spent';
     case RewardTier.PLATINUM:
-      return 'Earn 2.5 points for every \$1 spent + Free shipping + Priority support';
+      return 'Earn  point for every spent';
   }
 }
 

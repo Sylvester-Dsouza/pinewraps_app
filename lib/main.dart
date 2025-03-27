@@ -16,14 +16,55 @@ import 'screens/order_confirmation/order_confirmation_screen.dart';
 import 'screens/payment/order_success_screen.dart';
 import 'screens/payment/order_failed_screen.dart';
 import 'screens/orders/order_history_screen.dart';
+import 'screens/notifications/notification_screen.dart';
 import 'services/auth_service.dart';
 import 'services/cart_service.dart';
+import 'services/notification_service.dart';
 import 'screens/splash/splash_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
+  
+  // Set up the environment
+  setupEnvironment();
+  
+  // Initialize notification service
+  await NotificationService().initialize();
+  
   runApp(const MyApp());
+}
+
+// Helper function to set up the appropriate environment
+void setupEnvironment() {
+  const bool isProduction = bool.fromEnvironment('dart.vm.product');
+  
+  if (isProduction) {
+    // Production mode
+    EnvironmentConfig.setEnvironment(Environment.production);
+    print('🚀 Running in PRODUCTION mode - Using API: ${EnvironmentConfig.apiBaseUrl}');
+  } else {
+    // Development mode
+    EnvironmentConfig.setEnvironment(Environment.development);
+    
+    // Check if running in an emulator
+    const bool useEmulator = bool.fromEnvironment('USE_EMULATOR');
+    if (useEmulator) {
+      EnvironmentConfig.useEmulator(true);
+      EnvironmentConfig.usePhysicalDevice(false);
+      print('🛠️ Running in DEVELOPMENT mode with EMULATOR - Using API: ${EnvironmentConfig.apiBaseUrl}');
+    } else {
+      // Check for physical device vs web/desktop
+      const bool usePhysicalDevice = bool.fromEnvironment('USE_PHYSICAL_DEVICE', defaultValue: true);
+      EnvironmentConfig.usePhysicalDevice(usePhysicalDevice);
+      
+      if (usePhysicalDevice) {
+        print('📱 Running in DEVELOPMENT mode on PHYSICAL DEVICE - Using API: ${EnvironmentConfig.apiBaseUrl}');
+      } else {
+        print('🛠️ Running in DEVELOPMENT mode with LOCALHOST - Using API: ${EnvironmentConfig.apiBaseUrl}');
+      }
+    }
+  }
 }
 
 class MyApp extends StatelessWidget {
@@ -40,7 +81,10 @@ class MyApp extends StatelessWidget {
         title: 'Pinewraps',
         debugShowCheckedModeBanner: false,
         theme: ThemeData(
-          colorScheme: ColorScheme.fromSeed(seedColor: Colors.black),
+          colorScheme: ColorScheme.fromSeed(
+            seedColor: const Color(0xFF000000), // Black
+            primary: const Color(0xFF000000), // Black
+          ),
           useMaterial3: true,
           scaffoldBackgroundColor: Colors.white,
           appBarTheme: const AppBarTheme(
@@ -67,10 +111,22 @@ class MyApp extends StatelessWidget {
               ),
             ),
           ),
+          textButtonTheme: TextButtonThemeData(
+            style: TextButton.styleFrom(
+              foregroundColor: Colors.black,
+              textStyle: const TextStyle(
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
         ),
         home: const SplashScreen(),
         routes: {
-          '/home': (context) => const MainScreen(),
+          '/home': (context) {
+            final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+            final initialTab = args?['initialTab'] as int?;
+            return MainScreen(initialTab: initialTab);
+          },
           '/register': (context) => const RegisterScreen(),
           '/forgot-password': (context) => const ForgotPasswordScreen(),
           '/order-confirmation': (context) {
@@ -82,6 +138,7 @@ class MyApp extends StatelessWidget {
           '/shop': (context) => const ShopScreen(),
           '/profile/orders': (context) => const OrderHistoryScreen(),
           '/login': (context) => const LoginScreen(),
+          '/notifications': (context) => const NotificationScreen(),
         },
       ),
     );
@@ -89,14 +146,52 @@ class MyApp extends StatelessWidget {
 }
 
 class MainScreen extends StatefulWidget {
-  const MainScreen({super.key});
+  final int? initialTab;
+  
+  const MainScreen({
+    super.key,
+    this.initialTab,
+  });
 
   @override
-  State<MainScreen> createState() => _MainScreenState();
+  State<MainScreen> createState() => MainScreenState();
 }
 
-class _MainScreenState extends State<MainScreen> {
-  int _selectedIndex = 0;
+class MainScreenState extends State<MainScreen> {
+  int selectedIndex = 0;
+  final CartService _cartService = CartService();
+  bool _mounted = true;
+
+  void setIndex(int index) {
+    setState(() {
+      selectedIndex = index;
+    });
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _mounted = true;
+    _cartService.addListener(_onCartUpdate);
+    
+    // Set initial tab if provided
+    if (widget.initialTab != null) {
+      selectedIndex = widget.initialTab!;
+    }
+  }
+
+  @override
+  void dispose() {
+    _mounted = false;
+    _cartService.removeListener(_onCartUpdate);
+    super.dispose();
+  }
+
+  void _onCartUpdate() {
+    if (_mounted) {
+      setState(() {});
+    }
+  }
 
   static const List<Widget> _widgetOptions = <Widget>[
     HomeScreen(),
@@ -107,36 +202,68 @@ class _MainScreenState extends State<MainScreen> {
 
   void _onItemTapped(int index) {
     setState(() {
-      _selectedIndex = index;
+      selectedIndex = index;
     });
   }
 
   @override
   Widget build(BuildContext context) {
+    final cartItemCount = _cartService.cartItems.length;
+
     return Scaffold(
       body: Center(
-        child: _widgetOptions.elementAt(_selectedIndex),
+        child: _widgetOptions.elementAt(selectedIndex),
       ),
       bottomNavigationBar: BottomNavigationBar(
-        items: const [
-          BottomNavigationBarItem(
+        items: [
+          const BottomNavigationBarItem(
             icon: Icon(LineIcons.home),
             label: 'Home',
           ),
-          BottomNavigationBarItem(
+          const BottomNavigationBarItem(
             icon: Icon(LineIcons.shoppingBag),
             label: 'Shop',
           ),
           BottomNavigationBarItem(
-            icon: Icon(LineIcons.shoppingCart),
+            icon: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                const Icon(LineIcons.shoppingCart),
+                if (cartItemCount > 0)
+                  Positioned(
+                    right: -8,
+                    top: -8,
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: const BoxDecoration(
+                        color: Colors.red,
+                        shape: BoxShape.circle,
+                      ),
+                      constraints: const BoxConstraints(
+                        minWidth: 16,
+                        minHeight: 16,
+                      ),
+                      child: Text(
+                        cartItemCount.toString(),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
             label: 'Cart',
           ),
-          BottomNavigationBarItem(
+          const BottomNavigationBarItem(
             icon: Icon(LineIcons.user),
             label: 'Profile',
           ),
         ],
-        currentIndex: _selectedIndex,
+        currentIndex: selectedIndex,
         selectedItemColor: Colors.black,
         unselectedItemColor: Colors.grey,
         onTap: _onItemTapped,
