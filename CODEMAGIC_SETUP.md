@@ -1,99 +1,206 @@
-# Codemagic CI/CD Setup for Pinewraps App
+# Pinewraps App CI/CD Setup with Codemagic Workflow UI
 
-This guide explains how to set up and use Codemagic CI/CD for automating the deployment of the Pinewraps app to both App Store and Play Store.
+This document provides instructions for setting up continuous integration and deployment for the Pinewraps app using Codemagic's Workflow UI.
+
+## Overview
+
+The CI/CD pipeline is configured to:
+- Build and deploy Android apps to Google Play Store
+- Build and deploy iOS apps to App Store
+- Run automated tests and code analysis
+- Notify team members of build status
 
 ## Prerequisites
 
-1. A Codemagic account (sign up at [codemagic.io](https://codemagic.io))
-2. Access to Apple Developer account (for iOS)
-3. Access to Google Play Console (for Android)
-4. Signing credentials for both platforms
+Before you begin, ensure you have:
 
-## Setup Steps
+### For Android:
+1. A Google Play Console account with access to the Pinewraps app
+2. A Google Cloud service account with Play Store publishing permissions
+3. Android keystore file for signing the app
 
-### 1. Set up Environment Variables in Codemagic
+### For iOS:
+1. An Apple Developer account with access to the Pinewraps app
+2. App Store Connect API key
+3. iOS distribution certificate and provisioning profile
 
-Create the following environment variable groups in Codemagic UI:
+## Setup Instructions
 
-#### keystore_credentials (for Android)
-- `ANDROID_KEYSTORE`: Base64 encoded keystore file
-- `ANDROID_KEYSTORE_PASSWORD`: Keystore password
-- `ANDROID_KEY_ALIAS`: Key alias
-- `ANDROID_KEY_PASSWORD`: Key password
+### 1. Codemagic Account Setup
 
-To encode your keystore file to base64:
+1. Sign up for a Codemagic account at https://codemagic.io/signup
+2. Connect your GitHub/GitLab/Bitbucket account
+3. Add the Pinewraps repository to Codemagic
+
+### 2. Creating Android Workflow
+
+1. In the Codemagic dashboard, click on "Add application"
+2. Select your repository and click "Set up build"
+3. Choose "Flutter App" as the project type
+4. In the Workflow Editor, configure the following settings:
+
+#### Build Triggers:
+- Enable "Trigger on push"
+- Set branch pattern to include `main` and `release*`
+- Enable "Trigger on tag creation"
+
+#### Environment:
+- Flutter version: stable
+- Xcode version: latest
+- CocoaPods version: default
+
+#### Build for Platforms:
+- Select "Android"
+
+#### Build Arguments:
+- Build variant: `release`
+
+#### Android Signing:
+- Upload your keystore file
+- Enter your keystore password, key alias, and key password
+
+#### Pre-build Scripts:
 ```bash
-base64 -i keystore.jks -o keystore_base64.txt
+# Get Flutter packages
+flutter packages pub get
+
+# Run Flutter analyze
+flutter analyze
 ```
 
-#### google_play_credentials (for Android)
-- `GCLOUD_SERVICE_ACCOUNT_CREDENTIALS`: Google Play service account JSON key file content
+#### Build Scripts:
+```bash
+# Build AAB
+flutter build appbundle --release
 
-#### app_store_credentials (for iOS)
-- `APP_STORE_CONNECT_ISSUER_ID`: App Store Connect API key issuer ID
-- `APP_STORE_CONNECT_KEY_IDENTIFIER`: App Store Connect API key identifier
-- `APP_STORE_CONNECT_PRIVATE_KEY`: App Store Connect API private key
-- `APPLE_TEAM_ID`: Your Apple Developer Team ID
-- `PROVISIONING_PROFILE`: Name of your provisioning profile
+# Build APK for distribution
+flutter build apk --release --split-per-abi
+```
 
-#### firebase_credentials (optional, for Firebase)
-- `FIREBASE_CLI_TOKEN`: Firebase CLI token for Firebase App Distribution
+#### Artifacts:
+- `build/app/outputs/bundle/release/app-release.aab`
+- `build/app/outputs/flutter-apk/*-release.apk`
 
-### 2. Connect Your Repository
+#### Publishing:
+- **Google Play**: 
+  - Upload your Google Play service account JSON
+  - Select "Internal" track (can be changed to alpha, beta, or production later)
+  - Enable "Submit as draft"
+- **Email Notifications**:
+  - Add your team's email addresses
 
-1. Log in to Codemagic
-2. Add your app by connecting to your Git provider
-3. Select the Pinewraps repository
-4. Choose "Use codemagic.yaml" as your build configuration
+### 3. Creating iOS Workflow
 
-### 3. Customize the Workflows (if needed)
+1. In the Codemagic dashboard, create a new workflow or duplicate the Android workflow
+2. Update the following settings:
 
-The `codemagic.yaml` file includes two workflows:
-- `android-workflow`: Builds and publishes Android app to Play Store
-- `ios-workflow`: Builds and publishes iOS app to App Store
+#### Build for Platforms:
+- Select "iOS"
 
-You can customize these workflows by editing the `codemagic.yaml` file.
+#### iOS Signing:
+- Choose "Automatic" code signing method
+- Enter your App Store Connect API credentials:
+  - Issuer ID
+  - Key ID
+  - Upload your private key file
+- Enter your bundle identifier: `com.pinewraps.app`
 
-### 4. Start Your First Build
+#### Build Scripts:
+```bash
+# Get Flutter packages
+flutter packages pub get
 
+# Install pods
+find . -name "Podfile" -execdir pod install \;
+
+# Flutter analyze
+flutter analyze
+
+# Build IPA
+flutter build ipa --release
+```
+
+#### Artifacts:
+- `build/ios/ipa/*.ipa`
+
+#### Publishing:
+- **App Store Connect**:
+  - Enable "Submit to TestFlight"
+  - Disable "Submit to App Store" (enable after testing)
+- **Email Notifications**:
+  - Add your team's email addresses
+
+### 4. How to Generate Required Credentials
+
+#### Android Keystore
+If you don't have a keystore file yet:
+```bash
+keytool -genkey -v -keystore pinewraps.keystore -alias pinewraps -keyalg RSA -keysize 2048 -validity 10000
+```
+
+#### Google Play Service Account
+1. Go to Google Play Console → Setup → API access
+2. Create a new service account with "Release manager" role
+3. Download the JSON key file
+
+#### App Store Connect API Key
+1. Go to App Store Connect → Users and Access → Keys
+2. Create a new API key with App Manager role
+3. Note down the issuer ID and key ID
+4. Save the private key file securely
+
+## Running the Pipeline
+
+### Automatic Triggers
+The pipeline is configured to run automatically on:
+- Pushes to the `main` branch
+- Pushes to branches matching the pattern `release*`
+- Tag creation
+
+### Manual Triggers
+You can also manually trigger builds from the Codemagic dashboard:
 1. Go to your app in Codemagic
 2. Select the workflow you want to run
 3. Click "Start new build"
 
-## Workflow Configuration
+## Deployment Strategy
 
-### Android Workflow
+### Android
+- Builds are deployed to the Internal testing track in Google Play
+- After testing, they can be promoted to Alpha, Beta, and Production tracks
 
-- Builds an Android App Bundle (AAB)
-- Publishes to Google Play (internal track by default)
-- You can change the track by modifying the `GOOGLE_PLAY_TRACK` variable
-
-### iOS Workflow
-
-- Builds an iOS IPA file
-- Submits to TestFlight
-- Can be configured to submit directly to App Store
-
-## Automatic Triggers
-
-You can set up automatic triggers based on:
-- Push to specific branches
-- Pull request events
-- Tag creation
-
-To configure automatic triggers, go to your app settings in Codemagic.
+### iOS
+- Builds are deployed to TestFlight for testing
+- After testing, they can be submitted to the App Store for review
 
 ## Troubleshooting
 
-If you encounter any issues:
-1. Check the build logs in Codemagic
-2. Verify your environment variables are set correctly
-3. Ensure your signing credentials are valid
-4. Check that your app meets the store requirements
+### Common Issues
+
+1. **Build Failures**
+   - Check the build logs for specific error messages
+   - Ensure all environment variables are correctly set
+   - Verify that the keystore and service account credentials are valid
+
+2. **Deployment Failures**
+   - Ensure the app version and build number are incremented
+   - Check that the app meets the store requirements
+   - Verify the service account or API key has sufficient permissions
+
+3. **Code Signing Issues**
+   - Verify the keystore or certificate is valid and not expired
+   - Ensure the bundle ID matches the provisioning profile
 
 ## Additional Resources
 
 - [Codemagic Documentation](https://docs.codemagic.io/)
-- [Flutter Deployment Guide](https://docs.flutter.dev/deployment)
-- [Google Play Publishing](https://docs.codemagic.io/publishing/publishing-to-google-play/)
-- [App Store Publishing](https://docs.codemagic.io/publishing/publishing-to-app-store/)
+- [Google Play Console Help](https://support.google.com/googleplay/android-developer)
+- [App Store Connect Help](https://developer.apple.com/support/app-store-connect/)
+
+## Updating the Workflow
+
+To update the CI/CD pipeline:
+1. Go to your app in Codemagic
+2. Click on "Workflow settings"
+3. Make the necessary changes
+4. Save the workflow
