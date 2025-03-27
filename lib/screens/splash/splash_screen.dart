@@ -17,6 +17,8 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
   @override
   void initState() {
     super.initState();
+    print("SplashScreen initState called");
+    
     _controller = AnimationController(
       duration: const Duration(seconds: 2),
       vsync: this,
@@ -28,26 +30,47 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
     );
 
     _controller.forward();
+    print("Animation controller started");
 
     // Navigate after animation
+    print("Setting up navigation delay");
     Future.delayed(const Duration(seconds: 3), () {
+      print("Navigation delay completed, checking auth");
       _checkAuthAndNavigate();
     });
   }
 
   Future<void> _checkAuthAndNavigate() async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (!mounted) return;
-    
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(
-        builder: (context) => user != null ? const MainScreen() : const LoginScreen(),
-      ),
-    );
+    print("_checkAuthAndNavigate started");
+    try {
+      print("Getting current user");
+      final user = FirebaseAuth.instance.currentUser;
+      print("Current user: ${user?.uid ?? 'null'}");
+      
+      if (!mounted) {
+        print("Widget not mounted, returning");
+        return;
+      }
+      
+      if (user != null) {
+        print("User is logged in, navigating to MainScreen");
+        Navigator.pushReplacementNamed(context, '/home');
+      } else {
+        print("User is not logged in, navigating to LoginScreen");
+        Navigator.pushReplacementNamed(context, '/login');
+      }
+    } catch (e) {
+      print("Error during navigation: $e");
+      // Fallback to login screen if there's an error
+      if (mounted) {
+        Navigator.pushReplacementNamed(context, '/login');
+      }
+    }
   }
 
   @override
   void dispose() {
+    print("SplashScreen dispose called");
     _controller.dispose();
     super.dispose();
   }

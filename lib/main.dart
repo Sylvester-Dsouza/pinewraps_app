@@ -24,14 +24,30 @@ import 'screens/splash/splash_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp();
+  print("Flutter binding initialized");
+  
+  try {
+    print("Initializing Firebase...");
+    await Firebase.initializeApp();
+    print("Firebase initialized successfully");
+  } catch (e) {
+    print("Error initializing Firebase: $e");
+  }
   
   // Set up the environment
+  print("Setting up environment");
   setupEnvironment();
   
   // Initialize notification service
-  await NotificationService().initialize();
+  try {
+    print("Initializing notification service");
+    await NotificationService().initialize();
+    print("Notification service initialized");
+  } catch (e) {
+    print("Error initializing notification service: $e");
+  }
   
+  print("Running app");
   runApp(const MyApp());
 }
 

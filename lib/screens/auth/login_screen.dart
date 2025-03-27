@@ -127,85 +127,40 @@ class _LoginScreenState extends State<LoginScreen> {
     });
 
     try {
-      // Show loading indicator for social login
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Signing in with Google...'),
-          duration: Duration(seconds: 2),
-        ),
-      );
-      
-      // Start Google Sign In process
-      print('Starting Google sign-in process');
+      // Start the Google sign-in process
       final googleUser = await _authService.startGoogleSignIn();
-      
-      if (googleUser != null && mounted) {
-        // Show loading indicator for backend sync
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Completing sign-in...'),
-            duration: Duration(seconds: 2),
-          ),
-        );
-        
-        // Complete the backend sync and wait for it
-        print('Completing backend sync for user: ${googleUser.email}');
+      if (googleUser != null) {
+        // Complete the sign-in process with backend sync
         final result = await _authService.completeGoogleSignIn(googleUser);
-        print('Backend sync completed successfully');
+        print('Google sign in result: $result'); // Debug log
         
-        if (result.isEmpty) {
-          throw ApiException(
-            message: 'Failed to sync user data with backend',
-            statusCode: 500,
-          );
-        }
-
         if (mounted) {
-          // Show success message
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Sign in successful!'),
-              backgroundColor: Colors.green,
-            ),
-          );
-          
           // Navigate to main screen and remove all previous routes
           Navigator.of(context).pushReplacement(
             MaterialPageRoute(builder: (context) => const MainScreen()),
           );
         }
-      } else {
-        print('Google sign-in was cancelled or returned null');
-        throw ApiException(
-          message: 'Google sign in was cancelled',
-          statusCode: 401,
-        );
       }
     } catch (e) {
       print('Google Sign In Error: $e'); // Debug log
+      
       String errorMessage = 'Failed to sign in with Google';
       
-      if (e is ApiException) {
-        errorMessage = e.message;
-        print('API Exception: ${e.message} (${e.statusCode})');
-      } else if (e is FirebaseAuthException) {
-        // Handle specific Firebase auth errors
+      if (e is FirebaseAuthException) {
+        print('Firebase Auth Error Code: ${e.code}');
+        
         switch (e.code) {
           case 'account-exists-with-different-credential':
             errorMessage = 'An account already exists with the same email address but different sign-in credentials';
             break;
           case 'invalid-credential':
-            errorMessage = 'Invalid credentials';
+            errorMessage = 'The credential is malformed or has expired';
             break;
           case 'operation-not-allowed':
             errorMessage = 'Google sign-in is not enabled for this project';
             break;
           case 'user-disabled':
             errorMessage = 'Your account has been disabled';
-            break;
-          case 'user-not-found':
-          case 'wrong-password':
-            errorMessage = 'Invalid login credentials';
             break;
           default:
             errorMessage = e.message ?? 'An error occurred during sign in';
@@ -215,43 +170,6 @@ class _LoginScreenState extends State<LoginScreen> {
       }
       
       _showError(errorMessage);
-      
-      // Additional user feedback
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Sign in failed: $errorMessage'),
-          backgroundColor: Colors.red,
-          duration: const Duration(seconds: 4),
-        ),
-      );
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
-    }
-  }
-
-  Future<void> _signInWithApple() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
-
-    try {
-      final result = await _authService.signInWithApple();
-      print('Apple sign in result: $result'); // Debug log
-      
-      if (mounted) {
-        // Navigate to main screen and remove all previous routes
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (context) => const MainScreen()),
-        );
-      }
-    } catch (e) {
-      print('Apple Sign In Error: $e'); // Debug log
-      _showError('Failed to sign in with Apple');
     } finally {
       if (mounted) {
         setState(() {
@@ -272,12 +190,6 @@ class _LoginScreenState extends State<LoginScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // const SizedBox(height: 48),
-                // Image.asset(
-                //   'assets/images/logo.png',
-                //   height: 60,
-                //   fit: BoxFit.contain,
-                // ),
                 const SizedBox(height: 32),
                 Text(
                   'Welcome To PINEWRAPS',
@@ -374,26 +286,6 @@ class _LoginScreenState extends State<LoginScreen> {
                     height: 18,
                   ),
                   label: Text('Continue with Google', style: AuthStyles.buttonTextStyle),
-                ),
-                const SizedBox(height: 16),
-                OutlinedButton.icon(
-                  onPressed: _isLoading ? null : _signInWithApple,
-                  style: AuthStyles.outlinedButtonStyle,
-                  icon: Image.asset(
-                    'assets/images/apple.png',
-                    height: 20,
-                  ),
-                  label: Text('Continue with Apple', style: AuthStyles.buttonTextStyle),
-                ),
-                const SizedBox(height: 16),
-                OutlinedButton.icon(
-                  onPressed: null, // Disabled for now
-                  style: AuthStyles.outlinedButtonStyle,
-                  icon: Image.asset(
-                    'assets/images/facebook.png',
-                    height: 20,
-                  ),
-                  label: Text('Continue with Facebook', style: AuthStyles.buttonTextStyle),
                 ),
                 const SizedBox(height: 24),
                 Row(

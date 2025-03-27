@@ -33,9 +33,9 @@ class ApiService {
   ApiService._internal() {
     _dio = Dio(BaseOptions(
       baseUrl: _baseUrl,
-      connectTimeout: const Duration(seconds: 15),
-      receiveTimeout: const Duration(seconds: 15),
-      sendTimeout: const Duration(seconds: 15),
+      connectTimeout: const Duration(seconds: 30),
+      receiveTimeout: const Duration(seconds: 30),
+      sendTimeout: const Duration(seconds: 30),
       contentType: Headers.jsonContentType,
       responseType: ResponseType.json,
       listFormat: ListFormat.multiCompatible,
@@ -45,10 +45,11 @@ class ApiService {
       RetryInterceptor(
         dio: _dio,
         logPrint: print,
-        retries: 2,
+        retries: 3,
         retryDelays: const [
-          Duration(milliseconds: 500),
           Duration(seconds: 1),
+          Duration(seconds: 2),
+          Duration(seconds: 3),
         ],
       ),
     );
@@ -375,12 +376,43 @@ class ApiService {
       
       print('Request data: $data');
       
-      final response = await _dio.post(
+      // Create a dedicated Dio instance for this request with longer timeouts
+      final socialAuthDio = Dio(BaseOptions(
+        baseUrl: _baseUrl,
+        connectTimeout: const Duration(seconds: 60),
+        receiveTimeout: const Duration(seconds: 60),
+        sendTimeout: const Duration(seconds: 60),
+        contentType: Headers.jsonContentType,
+        validateStatus: (status) => true, // Allow any status code for better error handling
+      ));
+      
+      // Add logging interceptor
+      socialAuthDio.interceptors.add(
+        InterceptorsWrapper(
+          onRequest: (options, handler) {
+            print('Making request to: ${options.uri}');
+            print('Headers: ${options.headers}');
+            return handler.next(options);
+          },
+          onResponse: (response, handler) {
+            print('Received response: ${response.statusCode}');
+            print('Response data: ${response.data}');
+            return handler.next(response);
+          },
+          onError: (error, handler) {
+            print('Request error: ${error.message}');
+            if (error.response != null) {
+              print('Error response: ${error.response?.statusCode} - ${error.response?.data}');
+            }
+            return handler.next(error);
+          },
+        ),
+      );
+      
+      final response = await socialAuthDio.post(
         '/customer-auth/social',
         data: data,
         options: Options(
-          contentType: Headers.jsonContentType,
-          validateStatus: (status) => true, // Allow any status code for better error handling
           headers: {
             'Authorization': 'Bearer $token',
           },
@@ -391,7 +423,8 @@ class ApiService {
       print('Response data: ${response.data}');
 
       if (response.statusCode == 200 && response.data != null) {
-        if (response.data['data'] == null) {
+        final responseData = response.data;
+        if (responseData['data'] == null) {
           print('Invalid response format - missing data field');
           throw ApiException(
             message: 'Invalid response format from server: missing data field',
@@ -400,12 +433,12 @@ class ApiService {
         }
         
         // Double check the data structure
-        final responseData = response.data['data'];
-        print('Parsed response data: $responseData');
+        final responseDataMap = response.data['data'];
+        print('Parsed response data: $responseDataMap');
         
         // Make sure the token in the response is stored
-        if (responseData is Map && responseData['token'] != null) {
-          final newToken = responseData['token'] as String;
+        if (responseDataMap is Map && responseDataMap['token'] != null) {
+          final newToken = responseDataMap['token'] as String;
           print('New token received from server');
           await _setCachedFirebaseToken(newToken);
         }
