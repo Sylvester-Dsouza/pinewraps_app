@@ -5,7 +5,7 @@ enum Environment {
 }
 
 class EnvironmentConfig {
-  // Current environment
+  // Current envronment
   static Environment _environment = Environment.production;
   
   // Base URLs for different environments
