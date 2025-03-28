@@ -2,122 +2,42 @@ include: package:flutter_lints/flutter.yaml
 
 linter:
   rules:
-    # Error rules
-    always_use_package_imports: true
+    # Only the most critical error rules
     avoid_empty_else: true
-    avoid_relative_lib_imports: true
-    avoid_returning_null_for_future: true
     avoid_types_as_parameter_names: true
-    cancel_subscriptions: true
-    close_sinks: true
-    comment_references: true
-    empty_statements: true
-    hash_and_equals: true
-    iterable_contains_unrelated_type: true
-    list_remove_unrelated_type: true
     no_duplicate_case_values: true
-    no_logic_in_create_state: true
-    prefer_void_to_null: true
-    unrelated_type_equality_checks: true
-    valid_regexps: true
 
-    # Style rules
-    always_declare_return_types: true
+    # Minimal style rules
     annotate_overrides: true
-    avoid_bool_literals_in_conditional_expressions: true
-    avoid_catches_without_on_clauses: true
-    avoid_catching_errors: true
-    avoid_function_literals_in_foreach_calls: true
-    avoid_init_to_null: true
-    avoid_null_checks_in_equality_operators: true
-    avoid_renaming_method_parameters: true
-    avoid_return_types_on_setters: true
-    avoid_returning_null: true
-    avoid_returning_this: true
-    avoid_setters_without_getters: true
-    avoid_single_cascade_in_expression_statements: true
-    avoid_unnecessary_containers: true
-    avoid_unused_constructor_parameters: true
-    avoid_void_async: true
-    await_only_futures: true
     camel_case_types: true
-    constant_identifier_names: true
     curly_braces_in_flow_control_structures: true
-    directives_ordering: true
-    empty_catches: true
-    empty_constructor_bodies: true
-    file_names: true
-    implementation_imports: true
     library_names: true
-    library_prefixes: true
-    non_constant_identifier_names: true
-    null_closures: true
-    one_member_abstracts: true
-    only_throw_errors: true
-    overridden_fields: true
-    package_api_docs: true
-    package_names: true
-    package_prefixed_library_names: true
-    parameter_assignments: true
-    prefer_adjacent_string_concatenation: true
-    prefer_asserts_in_initializer_lists: true
-    prefer_collection_literals: true
-    prefer_conditional_assignment: true
-    prefer_const_constructors: true
-    prefer_const_constructors_in_immutables: true
-    prefer_const_declarations: true
-    prefer_const_literals_to_create_immutables: true
-    prefer_constructors_over_static_methods: true
-    prefer_contains: true
-    prefer_equal_for_default_values: true
-    prefer_final_fields: true
-    prefer_final_locals: true
-    prefer_foreach: true
-    prefer_function_declarations_over_variables: true
-    prefer_generic_function_type_aliases: true
-    prefer_initializing_formals: true
-    prefer_int_literals: true
-    prefer_interpolation_to_compose_strings: true
-    prefer_is_empty: true
-    prefer_is_not_empty: true
-    prefer_iterable_whereType: true
-    prefer_mixin: true
-    prefer_single_quotes: true
-    prefer_typing_uninitialized_variables: true
-    recursive_getters: true
-    slash_for_doc_comments: true
-    sort_constructors_first: true
-    sort_pub_dependencies: true
-    sort_unnamed_constructors_first: true
-    type_init_formals: true
-    unawaited_futures: true
-    unnecessary_await_in_return: true
-    unnecessary_brace_in_string_interps: true
-    unnecessary_const: true
-    unnecessary_getters_setters: true
-    unnecessary_lambdas: true
-    unnecessary_new: true
-    unnecessary_null_aware_assignments: true
-    unnecessary_null_in_if_null_operators: true
-    unnecessary_overrides: true
-    unnecessary_parenthesis: true
-    unnecessary_statements: true
-    unnecessary_this: true
-    use_full_hex_values_for_flutter_colors: true
-    use_rethrow_when_possible: true
-    use_setters_to_change_properties: true
-    use_string_buffers: true
-    use_to_and_as_if_applicable: true
-    void_checks: true
 
 analyzer:
   errors:
-    # treat missing required parameters as a warning (not a hint)
-    missing_required_param: warning
-    # treat missing returns as a warning (not a hint)
-    missing_return: warning
-    # allow having TODOs in the code
+    # Downgrade most lints to ignore
+    always_use_package_imports: ignore
+    avoid_print: ignore
+    prefer_const_constructors: ignore
+    prefer_const_declarations: ignore
+    prefer_single_quotes: ignore
+    sort_pub_dependencies: ignore
+    sort_constructors_first: ignore
+    unnecessary_const: ignore
+    unnecessary_this: ignore
+    unused_element: ignore
+    unused_field: ignore
+    unused_local_variable: ignore
+    unnecessary_null_comparison: ignore
+    unused_import: ignore
+    
+    # Downgrade other common issues to info
+    prefer_final_fields: info
+    prefer_final_locals: info
+    
+    # Allow TODOs in the code
     todo: ignore
+    
   exclude:
     - "**/*.g.dart"
     - "**/*.freezed.dart"

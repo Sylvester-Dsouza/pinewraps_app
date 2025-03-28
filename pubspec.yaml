@@ -104,3 +104,9 @@ flutter:
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/assets-and-images/#resolution-aware
+
+dependency_overrides:
+  open_file:
+    git:
+      url: https://github.com/crazecoder/open_file.git
+      ref: master
