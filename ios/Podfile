@@ -41,6 +41,9 @@ target 'Runner' do
   pod 'GoogleUtilities', :modular_headers => true
   pod 'GoogleDataTransport', :modular_headers => true
   
+  # Specific fix for webview_flutter_wkwebview
+  pod 'webview_flutter_wkwebview', :modular_headers => false
+  
   # Disable code signing for pods
   post_install do |installer|
     # Special fix for Codemagic build issues
@@ -64,23 +67,35 @@ target 'Runner' do
           config.build_settings['DEFINES_MODULE'] = 'YES'
         end
         
-        # Fix for webview_flutter_wkwebview 'Flutter/Flutter.h' file not found error
+        # Aggressive fix for webview_flutter_wkwebview 'Flutter/Flutter.h' file not found error
         if target.name.include?('webview_flutter') || target.name.include?('FWF')
           # Add Flutter framework search paths
           config.build_settings['FRAMEWORK_SEARCH_PATHS'] ||= ['$(inherited)']
           config.build_settings['FRAMEWORK_SEARCH_PATHS'] << "${PODS_ROOT}/../Flutter"
           config.build_settings['FRAMEWORK_SEARCH_PATHS'] << "${PODS_CONFIGURATION_BUILD_DIR}/Flutter"
           config.build_settings['FRAMEWORK_SEARCH_PATHS'] << "${PODS_ROOT}/../../Flutter"
+          config.build_settings['FRAMEWORK_SEARCH_PATHS'] << "${PODS_ROOT}/../../../Flutter"
+          config.build_settings['FRAMEWORK_SEARCH_PATHS'] << "${FLUTTER_ROOT}/bin/cache/artifacts/engine/ios/Flutter.xcframework/ios-arm64_armv7/Flutter.framework"
+          config.build_settings['FRAMEWORK_SEARCH_PATHS'] << "${FLUTTER_ROOT}/bin/cache/artifacts/engine/ios"
           
           # Add header search paths
           config.build_settings['HEADER_SEARCH_PATHS'] ||= ['$(inherited)']
           config.build_settings['HEADER_SEARCH_PATHS'] << "${PODS_ROOT}/Headers/Public/Flutter"
           config.build_settings['HEADER_SEARCH_PATHS'] << "${PODS_ROOT}/../Headers/Public/Flutter"
+          config.build_settings['HEADER_SEARCH_PATHS'] << "${PODS_ROOT}/../../Headers/Public/Flutter"
+          config.build_settings['HEADER_SEARCH_PATHS'] << "${FLUTTER_ROOT}/bin/cache/artifacts/engine/ios/Flutter.xcframework/ios-arm64_armv7/Flutter.framework/Headers"
           
           # Disable use of modules for Flutter headers
           config.build_settings['CLANG_MODULES_AUTOLINK'] = 'YES'
           config.build_settings['DEFINES_MODULE'] = 'YES'
           config.build_settings['SWIFT_INSTALL_OBJC_HEADER'] = 'YES'
+          
+          # Disable module validation for this target
+          config.build_settings['CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER'] = 'NO'
+          
+          # Force include the Flutter header directory
+          config.build_settings['OTHER_CFLAGS'] ||= ['$(inherited)']
+          config.build_settings['OTHER_CFLAGS'] << "-I${PODS_ROOT}/Headers/Public/Flutter"
         end
         
         # Fix for all targets to ensure Flutter.h can be found
