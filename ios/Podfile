@@ -41,9 +41,6 @@ target 'Runner' do
   pod 'GoogleUtilities', :modular_headers => true
   pod 'GoogleDataTransport', :modular_headers => true
   
-  # Specific fix for webview_flutter_wkwebview
-  pod 'webview_flutter_wkwebview', :modular_headers => false
-  
   # Disable code signing for pods
   post_install do |installer|
     # Special fix for Codemagic build issues
