@@ -32,9 +32,8 @@ target 'Runner' do
   use_modular_headers!
 
   flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
-
-  # Fix for webview_flutter_wkwebview
-  pod 'Flutter', :path => ENV['FLUTTER_ROOT']
+  
+  # Removed duplicate Flutter pod reference
 end
 
 target 'RunnerTests' do
