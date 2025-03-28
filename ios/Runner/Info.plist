@@ -28,6 +28,7 @@
 			<key>CFBundleURLSchemes</key>
 			<array>
 				<string>pinewraps</string>
+				<string>com.googleusercontent.apps.YOUR_CLIENT_ID</string>
 			</array>
 			<key>CFBundleURLName</key>
 			<string>com.pinewraps.app</string>
@@ -39,10 +40,6 @@
 	</array>
 	<key>GIDClientID</key>
 	<string>YOUR_GOOGLE_CLIENT_ID</string>
-	<key>CFBundleURLSchemes</key>
-	<array>
-		<string>com.googleusercontent.apps.YOUR_CLIENT_ID</string>
-	</array>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>UIBackgroundModes</key>
@@ -71,5 +68,18 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<!-- Privacy permissions -->
+	<key>NSCameraUsageDescription</key>
+	<string>This app needs camera access to scan QR codes</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>This app needs photo library access to upload images</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>This app needs location access for store locator features</string>
+	<!-- App Transport Security Settings -->
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsArbitraryLoads</key>
+		<true/>
+	</dict>
 </dict>
 </plist>
