@@ -38,24 +38,54 @@ post_install do |installer|
     flutter_additional_ios_build_settings(target)
     
     target.build_configurations.each do |config|
-      # Xcode 15 and common settings
+      # iOS deployment target
       config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '12.0'
+      
+      # Xcode build settings
+      config.build_settings['ENABLE_BITCODE'] = 'NO'
       config.build_settings['ENABLE_USER_SCRIPT_SANDBOXING'] = 'NO'
       config.build_settings['EXCLUDED_ARCHS[sdk=iphonesimulator*]'] = 'arm64'
       
-      # Disable Swift module interface verification
-      config.build_settings['OTHER_SWIFT_FLAGS'] ||= ['$(inherited)', '-Xfrontend', '-disable-module-interface-verification']
-      
-      # Fix Firebase and other module issues
-      config.build_settings['BUILD_LIBRARY_FOR_DISTRIBUTION'] = 'YES'
+      # Swift specific settings
       config.build_settings['SWIFT_VERSION'] = '5.0'
+      config.build_settings['SWIFT_TREAT_WARNINGS_AS_ERRORS'] = 'NO'
+      config.build_settings['GCC_TREAT_WARNINGS_AS_ERRORS'] = 'NO'
       
+      # Build settings for distribution
+      config.build_settings['BUILD_LIBRARY_FOR_DISTRIBUTION'] = 'YES'
+      config.build_settings['DEAD_CODE_STRIPPING'] = 'YES'
+      
+      # Module specific settings
+      config.build_settings['DEFINES_MODULE'] = 'YES'
+      config.build_settings['CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES'] = 'YES'
+      
+      # Swift compilation settings
+      if config.name == 'Debug'
+        config.build_settings['SWIFT_OPTIMIZATION_LEVEL'] = '-Onone'
+        config.build_settings['SWIFT_COMPILATION_MODE'] = 'singlefile'
+      else
+        config.build_settings['SWIFT_OPTIMIZATION_LEVEL'] = '-O'
+        config.build_settings['SWIFT_COMPILATION_MODE'] = 'wholemodule'
+      end
+      
+      # Fix for Firebase and other modules
       if target.name.include?('firebase_messaging') || target.name.include?('Firebase')
-        config.build_settings['DEFINES_MODULE'] = 'YES'
-        config.build_settings['CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES'] = 'YES'
         config.build_settings['HEADER_SEARCH_PATHS'] ||= '$(inherited)'
         config.build_settings['HEADER_SEARCH_PATHS'] += ' "${PODS_ROOT}/Headers/Public/Flutter"'
         config.build_settings['HEADER_SEARCH_PATHS'] += ' "${PODS_ROOT}/Headers/Public/Firebase"'
+        config.build_settings['OTHER_LDFLAGS'] ||= '$(inherited)'
+        config.build_settings['OTHER_LDFLAGS'] += ' -ObjC'
+      end
+    end
+  end
+
+  # Fix Xcode 15 code signing
+  installer.generated_projects.each do |project|
+    project.targets.each do |target|
+      target.build_configurations.each do |config|
+        config.build_settings['CODE_SIGN_IDENTITY'] = ''
+        config.build_settings['CODE_SIGNING_REQUIRED'] = 'NO'
+        config.build_settings['CODE_SIGNING_ALLOWED'] = 'NO'
       end
     end
   end
