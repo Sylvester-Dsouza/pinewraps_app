@@ -26,7 +26,23 @@ require File.expand_path(File.join('packages', 'flutter_tools', 'bin', 'podhelpe
 
 flutter_ios_podfile_setup
 
+# Define all Firebase related pods
+$firebase_pods = [
+  'Firebase',
+  'FirebaseCore',
+  'FirebaseCoreDiagnostics',
+  'FirebaseCoreInternal',
+  'FirebaseInstallations',
+  'FirebaseMessaging',
+  'firebase_core',
+  'firebase_messaging',
+  'GoogleDataTransport',
+  'GoogleUtilities',
+  'nanopb'
+]
+
 target 'Runner' do
+  # Do NOT use dynamic frameworks for Firebase to avoid header issues
   use_frameworks!
   use_modular_headers!
 
@@ -51,30 +67,37 @@ post_install do |installer|
       config.build_settings['SWIFT_TREAT_WARNINGS_AS_ERRORS'] = 'NO'
       config.build_settings['GCC_TREAT_WARNINGS_AS_ERRORS'] = 'NO'
       
-      # Build settings for distribution
-      config.build_settings['BUILD_LIBRARY_FOR_DISTRIBUTION'] = 'YES'
-      config.build_settings['DEAD_CODE_STRIPPING'] = 'YES'
-      
-      # Module specific settings
-      config.build_settings['DEFINES_MODULE'] = 'YES'
+      # Allow non-modular includes for ALL targets to fix Firebase header issues
       config.build_settings['CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES'] = 'YES'
       
-      # Swift compilation settings
+      # More permissive settings for Firebase modules
+      if $firebase_pods.any? { |firebase_pod| target.name.include?(firebase_pod) }
+        config.build_settings['APPLICATION_EXTENSION_API_ONLY'] = 'NO'
+        config.build_settings['BUILD_LIBRARY_FOR_DISTRIBUTION'] = 'YES'
+        config.build_settings['DEFINES_MODULE'] = 'YES'
+        
+        # Fix header search paths for Firebase
+        config.build_settings['HEADER_SEARCH_PATHS'] ||= '$(inherited)'
+        config.build_settings['HEADER_SEARCH_PATHS'] += ' "${PODS_ROOT}/Headers/Public"'
+        config.build_settings['HEADER_SEARCH_PATHS'] += ' "${PODS_ROOT}/Headers/Private"'
+        config.build_settings['HEADER_SEARCH_PATHS'] += ' "${PODS_ROOT}/Headers/Private/Firebase"'
+        config.build_settings['HEADER_SEARCH_PATHS'] += ' "${PODS_ROOT}/Headers/Public/Firebase"'
+        
+        # Add ObjC flag for Firebase
+        config.build_settings['OTHER_LDFLAGS'] ||= '$(inherited)'
+        config.build_settings['OTHER_LDFLAGS'] += ' -ObjC'
+        
+        # Disable modular headers for Firebase
+        config.build_settings['CLANG_MODULES_AUTOLINK'] = 'NO'
+      end
+      
+      # Swift optimization
       if config.name == 'Debug'
         config.build_settings['SWIFT_OPTIMIZATION_LEVEL'] = '-Onone'
         config.build_settings['SWIFT_COMPILATION_MODE'] = 'singlefile'
       else
         config.build_settings['SWIFT_OPTIMIZATION_LEVEL'] = '-O'
         config.build_settings['SWIFT_COMPILATION_MODE'] = 'wholemodule'
-      end
-      
-      # Fix for Firebase and other modules
-      if target.name.include?('firebase_messaging') || target.name.include?('Firebase')
-        config.build_settings['HEADER_SEARCH_PATHS'] ||= '$(inherited)'
-        config.build_settings['HEADER_SEARCH_PATHS'] += ' "${PODS_ROOT}/Headers/Public/Flutter"'
-        config.build_settings['HEADER_SEARCH_PATHS'] += ' "${PODS_ROOT}/Headers/Public/Firebase"'
-        config.build_settings['OTHER_LDFLAGS'] ||= '$(inherited)'
-        config.build_settings['OTHER_LDFLAGS'] += ' -ObjC'
       end
     end
   end
