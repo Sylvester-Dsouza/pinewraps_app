@@ -24,15 +24,20 @@ end
 
 require File.expand_path(File.join('packages', 'flutter_tools', 'bin', 'podhelper'), flutter_root)
 
-# Enable static framework support
-$static_framework = ['firebase_messaging']
+# Define static framework pods
+$static_framework = ['FirebaseCore',
+                    'FirebaseMessaging',
+                    'Firebase',
+                    'FirebaseCoreInternal',
+                    'GoogleUtilities',
+                    'nanopb']
 
 pre_install do |installer|
   Pod::Installer::Xcode::TargetValidator.send(:define_method, :verify_no_static_framework_transitive_dependencies) {}
   installer.pod_targets.each do |pod|
     if $static_framework.include?(pod.name)
       def pod.build_type;
-        Pod::BuildType.static_framework
+        Pod::BuildType.static_library
       end
     end
   end
@@ -41,10 +46,15 @@ end
 flutter_ios_podfile_setup
 
 target 'Runner' do
-  use_frameworks!
+  use_frameworks! 
   use_modular_headers!
 
   flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
+  
+  # Force Firebase pods to be static
+  pod 'FirebaseCore', :modular_headers => true
+  pod 'FirebaseMessaging', :modular_headers => true
+  pod 'GoogleUtilities', :modular_headers => true
 end
 
 post_install do |installer|
@@ -72,14 +82,18 @@ post_install do |installer|
       config.build_settings['EXCLUDED_ARCHS[sdk=iphonesimulator*]'] = 'arm64'
       
       # Fix Firebase modular headers issue
-      if ['firebase_messaging', 'Firebase', 'FirebaseCore', 'FirebaseMessaging'].include?(target.name)
-        config.build_settings['DEFINES_MODULE'] = 'YES'
+      if $static_framework.include?(target.name)
+        config.build_settings['BUILD_LIBRARY_FOR_DISTRIBUTION'] = 'YES'
         config.build_settings['CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES'] = 'YES'
         config.build_settings['APPLICATION_EXTENSION_API_ONLY'] = 'NO'
         
-        # Additional Firebase fixes
-        config.build_settings['BUILD_LIBRARY_FOR_DISTRIBUTION'] = 'YES'
-        config.build_settings['SWIFT_VERSION'] = '5.0'
+        # Additional Firebase settings
+        config.build_settings['OTHER_LDFLAGS'] ||= '$(inherited)'
+        config.build_settings['OTHER_LDFLAGS'] += ' -ObjC'
+        
+        # Ensure Firebase headers are found
+        config.build_settings['HEADER_SEARCH_PATHS'] += ' "${PODS_ROOT}/Firebase/CoreOnly/Sources"'
+        config.build_settings['HEADER_SEARCH_PATHS'] += ' "${PODS_TARGET_SRCROOT}"'
       end
     end
   end
