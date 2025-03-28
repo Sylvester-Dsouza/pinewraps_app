@@ -28,6 +28,9 @@ require File.expand_path(File.join('packages', 'flutter_tools', 'bin', 'podhelpe
 flutter_ios_podfile_setup
 
 target 'Runner' do
+  use_frameworks!
+  use_modular_headers!
+
   flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
 end
 
@@ -35,7 +38,6 @@ target 'RunnerTests' do
   inherit! :search_paths
 end
 
-# Post-install processing
 post_install do |installer|
   # Flutter-specific post-install
   flutter_post_install(installer) if defined?(flutter_post_install)
@@ -44,11 +46,6 @@ post_install do |installer|
     target.build_configurations.each do |config|
       # Fix for iOS 12.0 and above
       config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '12.0'
-      
-      # Fix for Firebase module issues
-      if target.name == 'firebase_messaging' || target.name.start_with?('Firebase')
-        config.build_settings['CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES'] = 'YES'
-      end
       
       # Fix for WebView Flutter WKWebView header issues
       if target.name.include?('webview_flutter') || target.name.include?('webview')
@@ -60,17 +57,23 @@ post_install do |installer|
         config.build_settings['HEADER_SEARCH_PATHS'] << ' "${PODS_ROOT}/../Flutter"'
         config.build_settings['HEADER_SEARCH_PATHS'] << ' "${PODS_CONFIGURATION_BUILD_DIR}/Flutter.framework/Headers"'
         config.build_settings['HEADER_SEARCH_PATHS'] << ' "${PODS_ROOT}/Headers/Public/Flutter"'
-        
-        # Add Flutter framework search paths
-        config.build_settings['FRAMEWORK_SEARCH_PATHS'] ||= '$(inherited)'
-        config.build_settings['FRAMEWORK_SEARCH_PATHS'] << ' "${PODS_ROOT}/../Flutter"'
-        config.build_settings['FRAMEWORK_SEARCH_PATHS'] << ' "${PODS_CONFIGURATION_BUILD_DIR}"'
+      end
+      
+      # Fix for Firebase module issues
+      if target.name == 'firebase_messaging' || target.name.start_with?('Firebase')
+        config.build_settings['CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES'] = 'YES'
       end
       
       # Disable code signing for pods
       config.build_settings['EXPANDED_CODE_SIGN_IDENTITY'] = ""
       config.build_settings['CODE_SIGNING_REQUIRED'] = "NO"
       config.build_settings['CODE_SIGNING_ALLOWED'] = "NO"
+      
+      # Additional fixes for Xcode 15 compatibility
+      config.build_settings['ENABLE_USER_SCRIPT_SANDBOXING'] = "NO"
+      
+      # Fix for arm64 architecture
+      config.build_settings['EXCLUDED_ARCHS[sdk=iphonesimulator*]'] = 'arm64'
     end
   end
 end
