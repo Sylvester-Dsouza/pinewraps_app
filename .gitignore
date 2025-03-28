@@ -43,7 +43,8 @@ app.*.map.json
 /android/app/release
 
 # Firebase configuration files
-google-services.json
-GoogleService-Info.plist
-**/google-services.json
-**/GoogleService-Info.plist
+# Uncommented to allow CI/CD builds to access these files
+# google-services.json
+# GoogleService-Info.plist
+# **/google-services.json
+# **/GoogleService-Info.plist
