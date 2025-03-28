@@ -5,8 +5,8 @@ enum Environment {
 }
 
 class EnvironmentConfig {
-  // Current envronment
-  static Environment _environment = Environment.production;
+  // Current environment
+  static Environment _environment = Environment.development;
   
   // Base URLs for different environments
   static const String _baseLocalUrl = 'http://localhost:3001';

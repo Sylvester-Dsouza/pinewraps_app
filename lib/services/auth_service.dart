@@ -4,7 +4,9 @@ import 'dart:async';
 import 'package:crypto/crypto.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import 'api_service.dart';
 import 'notification_service.dart';
 import 'cart_service.dart';
@@ -363,39 +365,269 @@ class AuthService extends ChangeNotifier {
     return digest.toString();
   }
 
+  Future<Map<String, dynamic>> signInWithApple() async {
+    try {
+      // To prevent replay attacks, we use a nonce which is a random string
+      final rawNonce = _generateNonce();
+      final nonce = _sha256ofString(rawNonce);
+
+      // Check platform
+      if (defaultTargetPlatform == TargetPlatform.iOS) {
+        // iOS implementation
+        final appleCredential = await SignInWithApple.getAppleIDCredential(
+          scopes: [
+            AppleIDAuthorizationScopes.email,
+            AppleIDAuthorizationScopes.fullName,
+          ],
+          nonce: nonce,
+        );
+
+        print('Apple Sign In credential obtained on iOS');
+
+        // Create OAuthCredential
+        final oauthCredential = OAuthProvider("apple.com").credential(
+          idToken: appleCredential.identityToken,
+          rawNonce: rawNonce,
+        );
+
+        // Sign in with Firebase
+        return _completeAppleSignIn(oauthCredential, appleCredential.givenName, appleCredential.familyName);
+      } else {
+        // Android implementation - use Firebase directly
+        print('Using Firebase Apple provider directly on Android');
+        
+        // Create Apple auth provider
+        final appleProvider = OAuthProvider('apple.com');
+        appleProvider.addScope('email');
+        appleProvider.addScope('name');
+        appleProvider.setCustomParameters({
+          'nonce': nonce,
+        });
+
+        try {
+          // Sign in with Firebase using signInWithProvider (works on mobile)
+          final authResult = await _auth.signInWithProvider(appleProvider);
+          final user = authResult.user;
+          final additionalUserInfo = authResult.additionalUserInfo;
+          
+          if (user == null) {
+            throw ApiException(
+              message: 'Failed to authenticate with Firebase',
+              statusCode: 401,
+            );
+          }
+
+          // Extract name from profile if available
+          String? firstName;
+          String? lastName;
+          
+          if (additionalUserInfo?.profile != null) {
+            final profile = additionalUserInfo!.profile!;
+            if (profile.containsKey('name')) {
+              final name = profile['name'];
+              if (name is String) {
+                final nameParts = name.split(' ');
+                firstName = nameParts.isNotEmpty ? nameParts.first : null;
+                lastName = nameParts.length > 1 ? nameParts.sublist(1).join(' ') : null;
+              }
+            }
+          }
+
+          // Create credential for completion
+          final credential = OAuthProvider('apple.com').credential();
+          return _completeAppleSignIn(credential, firstName, lastName);
+        } catch (e) {
+          print('Error with direct Firebase Apple Sign In: $e');
+          
+          // Fallback to web authentication for Android
+          print('Falling back to web authentication for Android');
+          final appleCredential = await SignInWithApple.getAppleIDCredential(
+            scopes: [
+              AppleIDAuthorizationScopes.email,
+              AppleIDAuthorizationScopes.fullName,
+            ],
+            nonce: nonce,
+            webAuthenticationOptions: WebAuthenticationOptions(
+              clientId: 'com.pinewraps.app',
+              redirectUri: Uri.parse(
+                'https://pinewraps-api.onrender.com/auth/apple/callback',
+              ),
+            ),
+          );
+
+          print('Apple Sign In credential obtained via web authentication');
+
+          // Create OAuthCredential
+          final oauthCredential = OAuthProvider("apple.com").credential(
+            idToken: appleCredential.identityToken,
+            rawNonce: rawNonce,
+          );
+
+          // Sign in with Firebase
+          return _completeAppleSignIn(oauthCredential, appleCredential.givenName, appleCredential.familyName);
+        }
+      }
+    } on SignInWithAppleException catch (e) {
+      print('Apple Sign In Exception: ${e.toString()}');
+      throw ApiException(
+        message: 'Apple Sign In failed: ${e.toString()}',
+        statusCode: 401,
+      );
+    } catch (e) {
+      print('Error signing in with Apple: $e');
+      throw ApiException(
+        message: 'Failed to sign in with Apple: ${e.toString()}',
+        statusCode: 500,
+      );
+    }
+  }
+
+  // Helper method to complete Apple sign in process
+  Future<Map<String, dynamic>> _completeAppleSignIn(
+    OAuthCredential credential,
+    String? firstName,
+    String? lastName,
+  ) async {
+    try {
+      // Sign in with Firebase using the Apple OAuth credential
+      final authResult = await _auth.signInWithCredential(credential);
+      final user = authResult.user;
+
+      if (user == null) {
+        throw ApiException(
+          message: 'Failed to authenticate with Firebase',
+          statusCode: 401,
+        );
+      }
+
+      // Get email from Firebase user
+      final email = user.email;
+      if (email == null) {
+        throw ApiException(
+          message: 'No email provided from Apple Sign In',
+          statusCode: 400,
+        );
+      }
+
+      // Get the Firebase ID token
+      final idToken = await user.getIdToken();
+      if (idToken == null) {
+        throw ApiException(
+          message: 'Failed to get Firebase ID token',
+          statusCode: 401,
+        );
+      }
+
+      // If this is the first sign-in and we have name information, update the user profile
+      if ((user.displayName == null || user.displayName!.isEmpty) && 
+          (firstName != null || lastName != null)) {
+        await user.updateDisplayName(
+          '${firstName ?? ''} ${lastName ?? ''}'.trim()
+        );
+        
+        // Force reload to get updated user info
+        await user.reload();
+      }
+      
+      // If we don't have first/last name from Apple, try to get it from the Firebase user profile
+      if ((firstName == null || lastName == null) && user.displayName != null) {
+        final nameParts = user.displayName!.split(' ');
+        firstName = firstName ?? (nameParts.isNotEmpty ? nameParts.first : '');
+        lastName = lastName ?? (nameParts.length > 1 ? nameParts.sublist(1).join(' ') : '');
+      }
+
+      // Sync with backend using social auth
+      final customerData = await _apiService.socialAuth(
+        provider: 'APPLE',
+        email: email,
+        firstName: firstName ?? 'Apple',
+        lastName: lastName ?? 'User',
+        imageUrl: user.photoURL,
+        token: idToken,
+      );
+
+      // Store the token
+      await cacheFirebaseToken(idToken);
+      
+      // Cache the customer email
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('customer_email', email);
+
+      // Register device for notifications
+      try {
+        await _notificationService.registerDeviceTokenAsync(email: email);
+      } catch (e) {
+        print('Error registering device token: $e');
+        // Continue with sign in even if token registration fails
+      }
+
+      return {
+        'success': true,
+        'user': {
+          'uid': user.uid,
+          'email': email,
+          'firstName': firstName,
+          'lastName': lastName,
+        },
+        'isNewUser': authResult.additionalUserInfo?.isNewUser ?? false,
+        'customerData': customerData,
+      };
+    } catch (e) {
+      print('Error completing Apple sign in: $e');
+      rethrow;
+    }
+  }
+
+  // Public method to cache Firebase token
+  Future<void> cacheFirebaseToken(String token) async {
+    await _apiService.cacheFirebaseToken(token);
+  }
+
   // Sign out
   Future<void> signOut() async {
     try {
-      print('Signing out...');
+      print('Starting sign out process...');
       
-      // Clear FCM token from backend
+      // Get email before logout for FCM token unregistration
+      final email = _apiService.getCachedCustomerEmail();
+      print('Email before logout: $email');
+      
+      // Get the FCM token before signing out
       try {
-        final user = _auth.currentUser;
-        if (user != null && user.email != null) {
-          print('Unregistering FCM token for ${user.email}');
-          await _notificationService.unregisterDeviceToken();
-        }
+        final notificationService = NotificationService();
+        await notificationService.unregisterDeviceToken();
       } catch (e) {
-        print('Error unregistering FCM token: $e');
-        // Continue with sign out even if clearing token fails
+        print('Error unregistering device token: $e');
+        // Continue with logout even if token unregistration fails
       }
+      
+      // Clear all API caches first
+      await _apiService.clearAllCache();
+      await _apiService.clearCustomerCache();
+      await _apiService.clearOrdersCache();
+      
+      // Clear any cached tokens
+      await _apiService.clearCachedFirebaseToken();
+      
+      // Sign out from Google if signed in with Google
+      await _googleSignIn.signOut();
       
       // Sign out from Firebase
       await _auth.signOut();
+
+      // Clear any stored preferences
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.clear();
       
-      // Sign out from Google
-      await _googleSignIn.signOut();
+      // Clear cart data
+      await _cartService.clearCart();
       
-      // Clear cart
-      _cartService.clearCart();
+      // Clear secure storage
+      final secureStorage = const FlutterSecureStorage();
+      await secureStorage.deleteAll();
       
-      // Clear cached token
-      await _apiService.clearCachedFirebaseToken();
-      
-      // Notify listeners
+      print('Successfully logged out and cleared all user data');
       notifyListeners();
-      
-      print('Sign out complete');
     } catch (e) {
       print('Error during sign out: $e');
       rethrow;
