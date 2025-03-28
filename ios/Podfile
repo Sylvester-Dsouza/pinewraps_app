@@ -24,6 +24,20 @@ end
 
 require File.expand_path(File.join('packages', 'flutter_tools', 'bin', 'podhelper'), flutter_root)
 
+# Enable static framework support
+$static_framework = ['firebase_messaging']
+
+pre_install do |installer|
+  Pod::Installer::Xcode::TargetValidator.send(:define_method, :verify_no_static_framework_transitive_dependencies) {}
+  installer.pod_targets.each do |pod|
+    if $static_framework.include?(pod.name)
+      def pod.build_type;
+        Pod::BuildType.static_framework
+      end
+    end
+  end
+end
+
 flutter_ios_podfile_setup
 
 target 'Runner' do
@@ -31,11 +45,6 @@ target 'Runner' do
   use_modular_headers!
 
   flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
-  
-  # Fix Firebase header issues
-  pod 'Firebase', :modular_headers => true
-  pod 'FirebaseCore', :modular_headers => true
-  pod 'GoogleUtilities', :modular_headers => true
 end
 
 post_install do |installer|
@@ -51,7 +60,6 @@ post_install do |installer|
   installer.pods_project.targets.each do |target|
     flutter_additional_ios_build_settings(target)
 
-    # Add header search paths for Flutter
     target.build_configurations.each do |config|
       # Add Flutter header search paths
       config.build_settings['HEADER_SEARCH_PATHS'] ||= '$(inherited)'
@@ -67,6 +75,11 @@ post_install do |installer|
       if ['firebase_messaging', 'Firebase', 'FirebaseCore', 'FirebaseMessaging'].include?(target.name)
         config.build_settings['DEFINES_MODULE'] = 'YES'
         config.build_settings['CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES'] = 'YES'
+        config.build_settings['APPLICATION_EXTENSION_API_ONLY'] = 'NO'
+        
+        # Additional Firebase fixes
+        config.build_settings['BUILD_LIBRARY_FOR_DISTRIBUTION'] = 'YES'
+        config.build_settings['SWIFT_VERSION'] = '5.0'
       end
     end
   end
