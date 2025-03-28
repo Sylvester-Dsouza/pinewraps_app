@@ -1,0 +1,62 @@
+workflows:
+  ios-production:
+    name: iOS Production Build
+    instance_type: mac_mini_m2
+    max_build_duration: 120
+    environment:
+      flutter: stable
+      xcode: latest
+      cocoapods: 1.12.1  # Stable version without 'present?' method issues
+      vars:
+        BUNDLE_ID: "com.pinewraps.app"
+        XCODE_WORKSPACE: "Runner.xcworkspace"
+        XCODE_SCHEME: "Runner"
+    scripts:
+      - name: Flutter setup and clean
+        script: |
+          echo "Setting up Flutter environment"
+          flutter clean
+          flutter pub get
+      - name: Set up code signing
+        script: |
+          echo "Setting up code signing"
+          keychain initialize
+          app-store-connect fetch-signing-files $BUNDLE_ID --type IOS_APP_STORE
+          keychain add-certificates
+          xcode-project use-profiles
+      - name: Pod setup and installation
+        script: |
+          echo "Setting up CocoaPods environment"
+          cd ios
+          
+          # Remove old pods and cache files
+          rm -rf Pods
+          rm -f Podfile.lock
+          rm -rf .symlinks
+          rm -rf Flutter/Flutter.framework
+          rm -rf Flutter/Flutter.podspec
+          
+          # Update CocoaPods repositories and install
+          pod repo update
+          pod install
+          
+          # Go back to root
+          cd ..
+      - name: Build iOS app
+        script: |
+          echo "Building iOS app"
+          flutter build ipa \
+            --release \
+            --build-name=1.0.0 \
+            --build-number=$(($(date +%s)/60)) \
+            --export-options-plist=/Users/builder/export_options.plist
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+      - flutter_drive.log
+    publishing:
+      app_store_connect:
+        api_key: $APP_STORE_CONNECT_PRIVATE_KEY
+        key_id: $APP_STORE_CONNECT_KEY_IDENTIFIER
+        issuer_id: $APP_STORE_CONNECT_ISSUER_ID
+        submit_to_testflight: true
