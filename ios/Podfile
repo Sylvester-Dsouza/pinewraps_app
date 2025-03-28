@@ -75,6 +75,10 @@ post_install do |installer|
       config.build_settings['OTHER_LDFLAGS'] += ' -framework UIKit'
       config.build_settings['OTHER_LDFLAGS'] += ' -framework CoreTelephony' 
       config.build_settings['OTHER_LDFLAGS'] += ' -framework Foundation'
+      config.build_settings['OTHER_LDFLAGS'] += ' -framework CoreGraphics'
+      config.build_settings['OTHER_LDFLAGS'] += ' -framework WebKit'
+      config.build_settings['OTHER_LDFLAGS'] += ' -framework UserNotifications'
+      config.build_settings['OTHER_LDFLAGS'] += ' -framework QuartzCore'
       
       # More permissive settings for Firebase modules
       if $firebase_pods.any? { |firebase_pod| target.name.include?(firebase_pod) }
@@ -96,6 +100,13 @@ post_install do |installer|
         config.build_settings['CLANG_MODULES_AUTOLINK'] = 'NO'
       end
       
+      # Special settings for webview_flutter_wkwebview to fix WebKit issues
+      if target.name.include?('webview_flutter')
+        config.build_settings['HEADER_SEARCH_PATHS'] ||= '$(inherited)'
+        config.build_settings['HEADER_SEARCH_PATHS'] += ' "${PODS_CONFIGURATION_BUILD_DIR}/path_provider_foundation"'
+        config.build_settings['DEFINES_MODULE'] = 'YES'
+      end
+      
       # Swift optimization
       if config.name == 'Debug'
         config.build_settings['SWIFT_OPTIMIZATION_LEVEL'] = '-Onone'
@@ -105,6 +116,13 @@ post_install do |installer|
         config.build_settings['SWIFT_COMPILATION_MODE'] = 'wholemodule'
       end
     end
+  end
+
+  # Add FRAMEWORK_SEARCH_PATHS to all targets to help find the frameworks
+  installer.pods_project.build_configurations.each do |config|
+    config.build_settings['FRAMEWORK_SEARCH_PATHS'] ||= '$(inherited)'
+    config.build_settings['FRAMEWORK_SEARCH_PATHS'] += ' "$(PODS_ROOT)/../.symlinks/flutter/ios"'
+    config.build_settings['FRAMEWORK_SEARCH_PATHS'] += ' "$(PODS_CONFIGURATION_BUILD_DIR)"'
   end
 
   # Fix Xcode 15 code signing
