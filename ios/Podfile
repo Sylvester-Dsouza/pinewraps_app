@@ -47,11 +47,6 @@ target 'Runner' do
   use_modular_headers!
 
   flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
-  
-  # Explicitly link essential iOS frameworks to fix symbol errors
-  pod 'UIKit', :modular_headers => true
-  pod 'CoreTelephony', :modular_headers => true
-  pod 'Foundation', :modular_headers => true
 end
 
 post_install do |installer|
@@ -67,12 +62,6 @@ post_install do |installer|
       config.build_settings['ENABLE_USER_SCRIPT_SANDBOXING'] = 'NO'
       config.build_settings['EXCLUDED_ARCHS[sdk=iphonesimulator*]'] = 'arm64'
       
-      # Link required frameworks to fix symbol errors
-      config.build_settings['OTHER_LDFLAGS'] ||= '$(inherited)'
-      config.build_settings['OTHER_LDFLAGS'] += ' -framework UIKit'
-      config.build_settings['OTHER_LDFLAGS'] += ' -framework CoreTelephony'
-      config.build_settings['OTHER_LDFLAGS'] += ' -framework Foundation'
-      
       # Swift specific settings
       config.build_settings['SWIFT_VERSION'] = '5.0'
       config.build_settings['SWIFT_TREAT_WARNINGS_AS_ERRORS'] = 'NO'
@@ -80,6 +69,12 @@ post_install do |installer|
       
       # Allow non-modular includes for ALL targets to fix Firebase header issues
       config.build_settings['CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES'] = 'YES'
+      
+      # Add framework dependencies for all targets
+      config.build_settings['OTHER_LDFLAGS'] ||= '$(inherited)'
+      config.build_settings['OTHER_LDFLAGS'] += ' -framework UIKit'
+      config.build_settings['OTHER_LDFLAGS'] += ' -framework CoreTelephony' 
+      config.build_settings['OTHER_LDFLAGS'] += ' -framework Foundation'
       
       # More permissive settings for Firebase modules
       if $firebase_pods.any? { |firebase_pod| target.name.include?(firebase_pod) }
