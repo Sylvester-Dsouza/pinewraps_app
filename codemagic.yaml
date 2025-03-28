@@ -11,19 +11,41 @@ workflows:
         BUNDLE_ID: "com.pinewraps.app"
         XCODE_WORKSPACE: "Runner.xcworkspace"
         XCODE_SCHEME: "Runner"
+        # iOS code signing variables
+        APP_STORE_CONNECT_TEAM_ID: "4J9WXB52YV" # Based on your logs
+    triggering:
+      events:
+        - push
+      branch_patterns:
+        - pattern: 'master'
+          include: true
     scripts:
+      - name: Set up app signing
+        script: |
+          echo "Setting up iOS app signing"
+          # Initialize keychain
+          keychain initialize
+          
+          # Use App Store Connect API to fetch signing files
+          app-store-connect fetch-signing-files "$BUNDLE_ID" \
+            --type IOS_APP_STORE \
+            --certificate-key "$APP_STORE_CONNECT_PRIVATE_KEY" \
+            --certificate-key-id "$APP_STORE_CONNECT_KEY_IDENTIFIER" \
+            --issuer-id "$APP_STORE_CONNECT_ISSUER_ID" \
+            --create
+          
+          # Add the fetched certificates to keychain
+          keychain add-certificates
+          
+          # Set up Xcode project with the fetched profiles
+          xcode-project use-profiles --warn-only
+          
       - name: Flutter setup and clean
         script: |
           echo "Setting up Flutter environment"
           flutter clean
           flutter pub get
-      - name: Set up code signing
-        script: |
-          echo "Setting up code signing"
-          keychain initialize
-          app-store-connect fetch-signing-files $BUNDLE_ID --type IOS_APP_STORE
-          keychain add-certificates
-          xcode-project use-profiles
+          
       - name: Pod setup and installation
         script: |
           echo "Setting up CocoaPods environment"
@@ -42,21 +64,34 @@ workflows:
           
           # Go back to root
           cd ..
+          
       - name: Build iOS app
         script: |
           echo "Building iOS app"
+          # Build IPA with specified export options
           flutter build ipa \
             --release \
             --build-name=1.0.0 \
             --build-number=$(($(date +%s)/60)) \
-            --export-options-plist=/Users/builder/export_options.plist
+            --export-options-plist=/Users/builder/export_options.plist \
+            --obfuscate \
+            --split-debug-info=build/debug-info
+            
     artifacts:
       - build/ios/ipa/*.ipa
       - /tmp/xcodebuild_logs/*.log
       - flutter_drive.log
+      - build/debug-info/*.symbols
+      
     publishing:
       app_store_connect:
+        # Use the App Store Connect API to publish to TestFlight
         api_key: $APP_STORE_CONNECT_PRIVATE_KEY
         key_id: $APP_STORE_CONNECT_KEY_IDENTIFIER
         issuer_id: $APP_STORE_CONNECT_ISSUER_ID
         submit_to_testflight: true
+        # Optional: Release to beta testers automatically
+        beta_groups: 
+          - "Pinewraps Beta Testers"
+        # Optional: Submit to App Store Review
+        submit_to_app_store: false
