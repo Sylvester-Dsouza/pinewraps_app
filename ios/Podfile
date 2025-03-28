@@ -41,8 +41,18 @@ $firebase_pods = [
   'nanopb'
 ]
 
+# List of system frameworks required by the app
+$required_frameworks = [
+  'UIKit',
+  'Foundation',
+  'CoreGraphics',
+  'WebKit', 
+  'CoreTelephony',
+  'SafariServices',
+  'SystemConfiguration'
+]
+
 target 'Runner' do
-  # Do NOT use dynamic frameworks for Firebase to avoid header issues
   use_frameworks!
   use_modular_headers!
 
@@ -50,6 +60,14 @@ target 'Runner' do
 end
 
 post_install do |installer|
+  # Ensure pods use compatible Firebase version
+  installer.aggregate_targets.each do |aggregate_target|
+    aggregate_target.xcconfigs.each do |config_name, config_file|
+      config_file.attributes['OTHER_CFLAGS'] = '$(inherited) -DFIREBASE_VERSION_MAJOR=10'
+      config_file.save_as(config_file.path)
+    end
+  end
+  
   installer.pods_project.targets.each do |target|
     flutter_additional_ios_build_settings(target)
     
@@ -67,47 +85,38 @@ post_install do |installer|
       config.build_settings['SWIFT_TREAT_WARNINGS_AS_ERRORS'] = 'NO'
       config.build_settings['GCC_TREAT_WARNINGS_AS_ERRORS'] = 'NO'
       
-      # Allow non-modular includes for ALL targets to fix Firebase header issues
+      # Fix non-modular headers for ALL targets
+      config.build_settings['DEFINES_MODULE'] = 'YES'
       config.build_settings['CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES'] = 'YES'
       
-      # Add framework dependencies for all targets
+      # Add required framework dependencies
       config.build_settings['OTHER_LDFLAGS'] ||= '$(inherited)'
-      config.build_settings['OTHER_LDFLAGS'] += ' -framework UIKit'
-      config.build_settings['OTHER_LDFLAGS'] += ' -framework CoreTelephony' 
-      config.build_settings['OTHER_LDFLAGS'] += ' -framework Foundation'
-      config.build_settings['OTHER_LDFLAGS'] += ' -framework CoreGraphics'
-      config.build_settings['OTHER_LDFLAGS'] += ' -framework WebKit'
-      config.build_settings['OTHER_LDFLAGS'] += ' -framework UserNotifications'
-      config.build_settings['OTHER_LDFLAGS'] += ' -framework QuartzCore'
+      $required_frameworks.each do |framework|
+        config.build_settings['OTHER_LDFLAGS'] += ' -framework ' + framework
+      end
+      config.build_settings['OTHER_LDFLAGS'] += ' -ObjC' # Required by all Firebase components
       
-      # More permissive settings for Firebase modules
+      # Fix Firebase modular headers issue
       if $firebase_pods.any? { |firebase_pod| target.name.include?(firebase_pod) }
         config.build_settings['APPLICATION_EXTENSION_API_ONLY'] = 'NO'
         config.build_settings['BUILD_LIBRARY_FOR_DISTRIBUTION'] = 'YES'
-        config.build_settings['DEFINES_MODULE'] = 'YES'
         
-        # Fix header search paths for Firebase
-        config.build_settings['HEADER_SEARCH_PATHS'] ||= '$(inherited)'
-        config.build_settings['HEADER_SEARCH_PATHS'] += ' "${PODS_ROOT}/Headers/Public"'
-        config.build_settings['HEADER_SEARCH_PATHS'] += ' "${PODS_ROOT}/Headers/Private"'
-        config.build_settings['HEADER_SEARCH_PATHS'] += ' "${PODS_ROOT}/Headers/Private/Firebase"'
-        config.build_settings['HEADER_SEARCH_PATHS'] += ' "${PODS_ROOT}/Headers/Public/Firebase"'
-        
-        # Add ObjC flag for Firebase
-        config.build_settings['OTHER_LDFLAGS'] += ' -ObjC'
-        
-        # Disable modular headers for Firebase
+        # Add comprehensive header search paths for Firebase
+        ['Public', 'Private'].each do |scope|
+          config.build_settings['HEADER_SEARCH_PATHS'] ||= '$(inherited)'
+          config.build_settings['HEADER_SEARCH_PATHS'] += " \"${PODS_ROOT}/Headers/#{scope}\""
+          config.build_settings['HEADER_SEARCH_PATHS'] += " \"${PODS_ROOT}/Headers/#{scope}/Firebase\""
+          $firebase_pods.each do |pod_name|
+            next if pod_name.include?('firebase_')
+            config.build_settings['HEADER_SEARCH_PATHS'] += " \"${PODS_ROOT}/Headers/#{scope}/#{pod_name}\""
+          end
+        end
+
+        # Disable modular headers autolink for Firebase
         config.build_settings['CLANG_MODULES_AUTOLINK'] = 'NO'
       end
       
-      # Special settings for webview_flutter_wkwebview to fix WebKit issues
-      if target.name.include?('webview_flutter')
-        config.build_settings['HEADER_SEARCH_PATHS'] ||= '$(inherited)'
-        config.build_settings['HEADER_SEARCH_PATHS'] += ' "${PODS_CONFIGURATION_BUILD_DIR}/path_provider_foundation"'
-        config.build_settings['DEFINES_MODULE'] = 'YES'
-      end
-      
-      # Swift optimization
+      # Swift optimization settings
       if config.name == 'Debug'
         config.build_settings['SWIFT_OPTIMIZATION_LEVEL'] = '-Onone'
         config.build_settings['SWIFT_COMPILATION_MODE'] = 'singlefile'
@@ -116,13 +125,6 @@ post_install do |installer|
         config.build_settings['SWIFT_COMPILATION_MODE'] = 'wholemodule'
       end
     end
-  end
-
-  # Add FRAMEWORK_SEARCH_PATHS to all targets to help find the frameworks
-  installer.pods_project.build_configurations.each do |config|
-    config.build_settings['FRAMEWORK_SEARCH_PATHS'] ||= '$(inherited)'
-    config.build_settings['FRAMEWORK_SEARCH_PATHS'] += ' "$(PODS_ROOT)/../.symlinks/flutter/ios"'
-    config.build_settings['FRAMEWORK_SEARCH_PATHS'] += ' "$(PODS_CONFIGURATION_BUILD_DIR)"'
   end
 
   # Fix Xcode 15 code signing
