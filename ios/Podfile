@@ -42,6 +42,16 @@ target 'Runner' do
           config.build_settings['CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES'] = 'YES'
         end
         
+        # Fix for WebView Flutter WKWebView header issues
+        if target.name.start_with?('webview_flutter_wkwebview')
+          config.build_settings['HEADER_SEARCH_PATHS'] ||= '$(inherited)'
+          config.build_settings['HEADER_SEARCH_PATHS'] << ' "${PODS_ROOT}/../../Flutter"'
+          config.build_settings['HEADER_SEARCH_PATHS'] << ' "${PODS_CONFIGURATION_BUILD_DIR}/Flutter/Flutter.framework/Headers"'
+          config.build_settings['FRAMEWORK_SEARCH_PATHS'] ||= '$(inherited)'
+          config.build_settings['FRAMEWORK_SEARCH_PATHS'] << ' "${PODS_CONFIGURATION_BUILD_DIR}/Flutter"'
+          config.build_settings['CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES'] = 'YES'
+        end
+        
         # This is necessary for Xcode 14
         config.build_settings['EXPANDED_CODE_SIGN_IDENTITY'] = ""
         config.build_settings['CODE_SIGNING_REQUIRED'] = "NO"
