@@ -6,11 +6,9 @@ workflows:
       xcode: latest
       cocoapods: default
       flutter: stable
-      groups:
-        - ios-credentials
-        - firebase-credentials
       vars:
         IOS_BUNDLE_ID: "com.pinewraps.app"
+        IOS_FIREBASE_CONFIG: $IOS_FIREBASE_CONFIG
     scripts:
       - name: Set up code signing settings
         script: |
@@ -56,9 +54,12 @@ workflows:
     instance_type: mac_mini_m1
     environment:
       flutter: stable
-      groups:
-        - android-credentials
-        - firebase-credentials
+      vars:
+        ANDROID_KEYSTORE: $ANDROID_KEYSTORE
+        ANDROID_KEYSTORE_PASSWORD: $ANDROID_KEYSTORE_PASSWORD
+        ANDROID_KEY_ALIAS: $ANDROID_KEY_ALIAS
+        ANDROID_KEY_PASSWORD: $ANDROID_KEY_PASSWORD
+        ANDROID_FIREBASE_CONFIG: $ANDROID_FIREBASE_CONFIG
     scripts:
       - name: Set up keystore
         script: |
@@ -98,12 +99,14 @@ workflows:
       xcode: latest
       cocoapods: default
       flutter: stable
-      groups:
-        - ios-credentials
-        - android-credentials
-        - firebase-credentials
       vars:
         IOS_BUNDLE_ID: "com.pinewraps.app"
+        IOS_FIREBASE_CONFIG: $IOS_FIREBASE_CONFIG
+        ANDROID_KEYSTORE: $ANDROID_KEYSTORE
+        ANDROID_KEYSTORE_PASSWORD: $ANDROID_KEYSTORE_PASSWORD
+        ANDROID_KEY_ALIAS: $ANDROID_KEY_ALIAS
+        ANDROID_KEY_PASSWORD: $ANDROID_KEY_PASSWORD
+        ANDROID_FIREBASE_CONFIG: $ANDROID_FIREBASE_CONFIG
     triggering:
       events:
         - push
