@@ -12,6 +12,22 @@ workflows:
       vars:
         IOS_BUNDLE_ID: "com.pinewraps.app"
     scripts:
+      - name: Set up code signing
+        script: |
+          echo "Setting up code signing"
+          # Use the certificate from Codemagic
+          keychain initialize
+          
+          # Use the provisioning profile from Codemagic
+          if [ -n "$CM_PROVISIONING_PROFILE" ]; then
+            echo "Using provisioning profile from Codemagic"
+            mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
+            echo "$CM_PROVISIONING_PROFILE" | base64 --decode > ~/Library/MobileDevice/Provisioning\ Profiles/profile.mobileprovision
+            echo "Installed provisioning profile"
+          else
+            echo "No provisioning profile found in Codemagic"
+          fi
+          
       - name: Set up Firebase configuration
         script: |
           echo "Setting up Firebase configuration"
@@ -162,6 +178,22 @@ workflows:
           include: true
     scripts:
       # iOS setup and build
+      - name: Set up iOS code signing
+        script: |
+          echo "Setting up code signing"
+          # Use the certificate from Codemagic
+          keychain initialize
+          
+          # Use the provisioning profile from Codemagic
+          if [ -n "$CM_PROVISIONING_PROFILE" ]; then
+            echo "Using provisioning profile from Codemagic"
+            mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
+            echo "$CM_PROVISIONING_PROFILE" | base64 --decode > ~/Library/MobileDevice/Provisioning\ Profiles/profile.mobileprovision
+            echo "Installed provisioning profile"
+          else
+            echo "No provisioning profile found in Codemagic"
+          fi
+          
       - name: Set up iOS Firebase configuration
         script: |
           echo "Setting up iOS Firebase configuration"
@@ -277,7 +309,6 @@ workflows:
           cd "$FCI_BUILD_DIR"
           flutter build apk --release
           flutter build appbundle --release
-          
     artifacts:
       - build/ios/ipa/*.ipa
       - build/ios/xcarchive/*.xcarchive
