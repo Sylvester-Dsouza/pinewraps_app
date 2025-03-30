@@ -1,0 +1,181 @@
+workflows:
+  ios-workflow:
+    name: iOS Workflow
+    instance_type: mac_mini_m1
+    environment:
+      xcode: latest
+      cocoapods: default
+      flutter: stable
+      groups:
+        - app_store_credentials
+        - firebase_credentials
+      vars:
+        IOS_BUNDLE_ID: "com.pinewraps.app"
+    scripts:
+      - name: Set up code signing settings
+        script: |
+          echo "Setting up code signing with App Store Connect API"
+          # Create temporary keychain
+          keychain initialize
+          
+          # Use App Store Connect API for automatic code signing
+          app-store-connect fetch-signing-files "$IOS_BUNDLE_ID" --type IOS_APP_STORE --create
+          keychain add-certificates
+          
+          # Set up provisioning profile
+          xcode-project use-profiles
+          
+          # Set up Firebase configuration if needed
+          if [ -n "$IOS_FIREBASE_CONFIG" ]; then
+            echo "Setting up Firebase configuration"
+            echo $IOS_FIREBASE_CONFIG | base64 --decode > $FCI_BUILD_DIR/pinewraps_app/ios/Runner/GoogleService-Info.plist
+          fi
+          
+      - name: Run iOS prebuild script
+        script: |
+          echo "Running iOS prebuild script"
+          chmod +x $FCI_BUILD_DIR/pinewraps_app/ios_prebuild.sh
+          $FCI_BUILD_DIR/pinewraps_app/ios_prebuild.sh
+          
+      - name: Flutter build iOS
+        script: |
+          cd $FCI_BUILD_DIR/pinewraps_app
+          flutter build ios --release
+          
+      - name: Create IPA
+        script: |
+          cd $FCI_BUILD_DIR/pinewraps_app/ios
+          xcodebuild -workspace Runner.xcworkspace -scheme Runner -configuration Release -archivePath build/Runner.xcarchive archive
+          xcodebuild -exportArchive -archivePath build/Runner.xcarchive -exportOptionsPlist exportOptions.plist -exportPath build/ios/ipa
+    artifacts:
+      - pinewraps_app/build/ios/ipa/*.ipa
+      - pinewraps_app/build/ios/xcarchive/*.xcarchive
+      
+  android-workflow:
+    name: Android Workflow
+    instance_type: mac_mini_m1
+    environment:
+      flutter: stable
+      groups:
+        - android_credentials
+        - firebase_credentials
+    scripts:
+      - name: Set up keystore
+        script: |
+          echo "Setting up Android keystore"
+          echo $ANDROID_KEYSTORE | base64 --decode > $FCI_BUILD_DIR/keystore.jks
+          
+          # Create key.properties file
+          cat >> "$FCI_BUILD_DIR/pinewraps_app/android/key.properties" << EOF
+          storeFile=$FCI_BUILD_DIR/keystore.jks
+          storePassword=$ANDROID_KEYSTORE_PASSWORD
+          keyAlias=$ANDROID_KEY_ALIAS
+          keyPassword=$ANDROID_KEY_PASSWORD
+          EOF
+          
+          # Set up Firebase configuration if needed
+          if [ -n "$ANDROID_FIREBASE_CONFIG" ]; then
+            echo "Setting up Firebase configuration"
+            echo $ANDROID_FIREBASE_CONFIG | base64 --decode > $FCI_BUILD_DIR/pinewraps_app/android/app/google-services.json
+          fi
+          
+      - name: Flutter build APK and AppBundle
+        script: |
+          cd $FCI_BUILD_DIR/pinewraps_app
+          # Uncomment the following line if you need to build a specific flavor
+          # flutter build apk --release --flavor production
+          flutter build apk --release
+          flutter build appbundle --release
+    artifacts:
+      - pinewraps_app/build/app/outputs/flutter-apk/*.apk
+      - pinewraps_app/build/app/outputs/bundle/release/*.aab
+      
+  # Combined workflow that builds both iOS and Android
+  combined-workflow:
+    name: iOS and Android Build
+    instance_type: mac_mini_m1
+    environment:
+      xcode: latest
+      cocoapods: default
+      flutter: stable
+      groups:
+        - ios_credentials
+        - android_credentials
+        - firebase_credentials
+      vars:
+        IOS_BUNDLE_ID: "com.pinewraps.app"
+    triggering:
+      events:
+        - push
+      branch_patterns:
+        - pattern: master
+          include: true
+    scripts:
+      # iOS setup and build
+      - name: Set up iOS code signing
+        script: |
+          echo "Setting up iOS code signing"
+          keychain initialize
+          app-store-connect fetch-signing-files "$IOS_BUNDLE_ID" --type IOS_APP_STORE --create
+          keychain add-certificates
+          xcode-project use-profiles
+          
+          # Set up Firebase configuration if needed
+          if [ -n "$IOS_FIREBASE_CONFIG" ]; then
+            echo $IOS_FIREBASE_CONFIG | base64 --decode > $FCI_BUILD_DIR/pinewraps_app/ios/Runner/GoogleService-Info.plist
+          fi
+          
+      - name: Run iOS prebuild script
+        script: |
+          echo "Running iOS prebuild script"
+          chmod +x $FCI_BUILD_DIR/pinewraps_app/ios_prebuild.sh
+          $FCI_BUILD_DIR/pinewraps_app/ios_prebuild.sh
+          
+      - name: Flutter build iOS
+        script: |
+          cd $FCI_BUILD_DIR/pinewraps_app
+          flutter build ios --release
+          
+      - name: Create iOS IPA
+        script: |
+          cd $FCI_BUILD_DIR/pinewraps_app/ios
+          xcodebuild -workspace Runner.xcworkspace -scheme Runner -configuration Release -archivePath build/Runner.xcarchive archive
+          xcodebuild -exportArchive -archivePath build/Runner.xcarchive -exportOptionsPlist exportOptions.plist -exportPath build/ios/ipa
+          
+      # Android setup and build
+      - name: Set up Android keystore
+        script: |
+          echo "Setting up Android keystore"
+          echo $ANDROID_KEYSTORE | base64 --decode > $FCI_BUILD_DIR/keystore.jks
+          
+          # Create key.properties file
+          cat >> "$FCI_BUILD_DIR/pinewraps_app/android/key.properties" << EOF
+          storeFile=$FCI_BUILD_DIR/keystore.jks
+          storePassword=$ANDROID_KEYSTORE_PASSWORD
+          keyAlias=$ANDROID_KEY_ALIAS
+          keyPassword=$ANDROID_KEY_PASSWORD
+          EOF
+          
+          # Set up Firebase configuration if needed
+          if [ -n "$ANDROID_FIREBASE_CONFIG" ]; then
+            echo $ANDROID_FIREBASE_CONFIG | base64 --decode > $FCI_BUILD_DIR/pinewraps_app/android/app/google-services.json
+          fi
+          
+      - name: Flutter build Android
+        script: |
+          cd $FCI_BUILD_DIR/pinewraps_app
+          flutter build apk --release
+          flutter build appbundle --release
+          
+    artifacts:
+      - pinewraps_app/build/ios/ipa/*.ipa
+      - pinewraps_app/build/ios/xcarchive/*.xcarchive
+      - pinewraps_app/build/app/outputs/flutter-apk/*.apk
+      - pinewraps_app/build/app/outputs/bundle/release/*.aab
+    publishing:
+      email:
+        recipients:
+          - your-email@example.com
+        notify:
+          success: true
+          failure: true
