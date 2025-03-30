@@ -43,6 +43,26 @@ if [ -n "$WEBVIEW_POD_DIR" ]; then
   ln -sf ../../../../../Flutter/engine/Flutter.framework/Headers/Flutter.h $WEBVIEW_POD_DIR/Sources/webview_flutter_wkwebview/include/webview_flutter_wkwebview/Flutter.h
 fi
 
+# Fix sqflite_darwin issues
+echo "Fixing sqflite_darwin issues..."
+SQFLITE_POD_DIR=$(find . -type d -name "sqflite_darwin" | head -n 1)
+if [ -n "$SQFLITE_POD_DIR" ]; then
+  echo "Found sqflite_darwin at $SQFLITE_POD_DIR"
+  mkdir -p $SQFLITE_POD_DIR/Sources/sqflite_darwin/include/sqflite_darwin
+  ln -sf ../../../../../Flutter/engine/Flutter.framework/Headers/Flutter.h $SQFLITE_POD_DIR/Sources/sqflite_darwin/include/sqflite_darwin/Flutter.h
+fi
+
+# Fix any other potential Flutter.h issues by creating symlinks in all plugin directories
+echo "Creating Flutter.h symlinks in all plugin directories..."
+find . -type d -name "Sources" | while read sources_dir; do
+  include_dir="$sources_dir/$(basename $(dirname $sources_dir))/include/$(basename $(dirname $sources_dir))"
+  if [ -d "$include_dir" ]; then
+    echo "Creating symlink in $include_dir"
+    mkdir -p "$include_dir"
+    ln -sf ../../../../../Flutter/engine/Flutter.framework/Headers/Flutter.h "$include_dir/Flutter.h"
+  fi
+done
+
 # Return to project root
 cd ..
 
