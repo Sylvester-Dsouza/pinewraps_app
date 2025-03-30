@@ -17,7 +17,7 @@ workflows:
           echo "Setting up Firebase configuration"
           mkdir -p $FCI_BUILD_DIR/ios/Runner
           # Create the file manually from the known content
-          cat > $FCI_BUILD_DIR/ios/Runner/GoogleService-Info.plist << EOL
+          cat > $FCI_BUILD_DIR/ios/Runner/GoogleService-Info.plist << 'EOL'
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -167,7 +167,7 @@ EOF
           echo "Setting up iOS Firebase configuration"
           mkdir -p $FCI_BUILD_DIR/ios/Runner
           # Create the file manually from the known content
-          cat > $FCI_BUILD_DIR/ios/Runner/GoogleService-Info.plist << EOL
+          cat > $FCI_BUILD_DIR/ios/Runner/GoogleService-Info.plist << 'EOL'
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
