@@ -11,21 +11,18 @@ workflows:
         bundle_identifier: com.pinewraps.app
       vars:
         IOS_BUNDLE_ID: "com.pinewraps.app"
+        APP_STORE_CONNECT_ISSUER_ID: ${APP_STORE_CONNECT_ISSUER_ID}
+        APP_STORE_CONNECT_KEY_IDENTIFIER: ${APP_STORE_CONNECT_KEY_IDENTIFIER}
+        APP_STORE_CONNECT_PRIVATE_KEY: ${APP_STORE_CONNECT_PRIVATE_KEY}
     scripts:
       - name: Set up code signing
         script: |
-          echo "Setting up code signing"
-          # Use the certificate from Codemagic
-          keychain initialize
-          
-          # Use the provisioning profile from Codemagic
-          if [ -n "$CM_PROVISIONING_PROFILE" ]; then
-            echo "Using provisioning profile from Codemagic"
-            mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
-            echo "$CM_PROVISIONING_PROFILE" | base64 --decode > ~/Library/MobileDevice/Provisioning\ Profiles/profile.mobileprovision
-            echo "Installed provisioning profile"
+          echo "Setting up automatic code signing with App Store Connect API"
+          if [ -n "$APP_STORE_CONNECT_ISSUER_ID" ] && [ -n "$APP_STORE_CONNECT_KEY_IDENTIFIER" ] && [ -n "$APP_STORE_CONNECT_PRIVATE_KEY" ]; then
+            echo "Using App Store Connect API for code signing"
+            app-store-connect fetch-signing-files "$IOS_BUNDLE_ID" --type IOS_APP_STORE --create
           else
-            echo "No provisioning profile found in Codemagic"
+            echo "Warning: App Store Connect API credentials not found. Code signing may fail."
           fi
           
       - name: Set up Firebase configuration
@@ -170,6 +167,9 @@ workflows:
         bundle_identifier: com.pinewraps.app
       vars:
         IOS_BUNDLE_ID: "com.pinewraps.app"
+        APP_STORE_CONNECT_ISSUER_ID: ${APP_STORE_CONNECT_ISSUER_ID}
+        APP_STORE_CONNECT_KEY_IDENTIFIER: ${APP_STORE_CONNECT_KEY_IDENTIFIER}
+        APP_STORE_CONNECT_PRIVATE_KEY: ${APP_STORE_CONNECT_PRIVATE_KEY}
     triggering:
       events:
         - push
@@ -180,18 +180,12 @@ workflows:
       # iOS setup and build
       - name: Set up iOS code signing
         script: |
-          echo "Setting up code signing"
-          # Use the certificate from Codemagic
-          keychain initialize
-          
-          # Use the provisioning profile from Codemagic
-          if [ -n "$CM_PROVISIONING_PROFILE" ]; then
-            echo "Using provisioning profile from Codemagic"
-            mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
-            echo "$CM_PROVISIONING_PROFILE" | base64 --decode > ~/Library/MobileDevice/Provisioning\ Profiles/profile.mobileprovision
-            echo "Installed provisioning profile"
+          echo "Setting up automatic code signing with App Store Connect API"
+          if [ -n "$APP_STORE_CONNECT_ISSUER_ID" ] && [ -n "$APP_STORE_CONNECT_KEY_IDENTIFIER" ] && [ -n "$APP_STORE_CONNECT_PRIVATE_KEY" ]; then
+            echo "Using App Store Connect API for code signing"
+            app-store-connect fetch-signing-files "$IOS_BUNDLE_ID" --type IOS_APP_STORE --create
           else
-            echo "No provisioning profile found in Codemagic"
+            echo "Warning: App Store Connect API credentials not found. Code signing may fail."
           fi
           
       - name: Set up iOS Firebase configuration
