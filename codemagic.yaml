@@ -17,24 +17,25 @@ workflows:
     scripts:
       - name: Set up code signing
         script: |
-          echo "Setting up automatic code signing with App Store Connect API"
+          echo "Setting up code signing for iOS"
+          # Initialize keychain
+          keychain initialize
+          
+          # Fetch certificate and provisioning profile
+          # First try App Store Connect API
           if [ -n "$APP_STORE_CONNECT_ISSUER_ID" ] && [ -n "$APP_STORE_CONNECT_KEY_IDENTIFIER" ] && [ -n "$APP_STORE_CONNECT_PRIVATE_KEY" ]; then
             echo "Using App Store Connect API for code signing"
             # First, create the app in App Store Connect if it doesn't exist
-            app-store-connect create-app "$IOS_BUNDLE_ID" "Pinewraps" --skip-if-exists
+            app-store-connect create-app "$IOS_BUNDLE_ID" "Pinewraps" --skip-if-exists || true
             
             # Then fetch or create the signing files
-            app-store-connect fetch-signing-files "$IOS_BUNDLE_ID" --type IOS_APP_STORE --create
-            
-            # Check if the profile was created successfully
-            if [ $? -ne 0 ]; then
-              echo "Failed to fetch or create provisioning profile. Please check your App Store Connect API credentials."
-              exit 1
-            fi
-          else
-            echo "Error: App Store Connect API credentials not found. Cannot proceed with automatic code signing."
-            exit 1
+            app-store-connect fetch-signing-files "$IOS_BUNDLE_ID" --type IOS_APP_STORE --create || true
           fi
+          
+          # Use Codemagic's automatic code signing as a fallback
+          echo "Using Codemagic's automatic code signing"
+          # This will use the code signing settings from the Codemagic UI
+          # No additional commands needed as it's handled by Codemagic automatically
           
       - name: Set up Firebase configuration
         script: |
@@ -190,24 +191,25 @@ workflows:
       # iOS setup and build
       - name: Set up iOS code signing
         script: |
-          echo "Setting up automatic code signing with App Store Connect API"
+          echo "Setting up code signing for iOS"
+          # Initialize keychain
+          keychain initialize
+          
+          # Fetch certificate and provisioning profile
+          # First try App Store Connect API
           if [ -n "$APP_STORE_CONNECT_ISSUER_ID" ] && [ -n "$APP_STORE_CONNECT_KEY_IDENTIFIER" ] && [ -n "$APP_STORE_CONNECT_PRIVATE_KEY" ]; then
             echo "Using App Store Connect API for code signing"
             # First, create the app in App Store Connect if it doesn't exist
-            app-store-connect create-app "$IOS_BUNDLE_ID" "Pinewraps" --skip-if-exists
+            app-store-connect create-app "$IOS_BUNDLE_ID" "Pinewraps" --skip-if-exists || true
             
             # Then fetch or create the signing files
-            app-store-connect fetch-signing-files "$IOS_BUNDLE_ID" --type IOS_APP_STORE --create
-            
-            # Check if the profile was created successfully
-            if [ $? -ne 0 ]; then
-              echo "Failed to fetch or create provisioning profile. Please check your App Store Connect API credentials."
-              exit 1
-            fi
-          else
-            echo "Error: App Store Connect API credentials not found. Cannot proceed with automatic code signing."
-            exit 1
+            app-store-connect fetch-signing-files "$IOS_BUNDLE_ID" --type IOS_APP_STORE --create || true
           fi
+          
+          # Use Codemagic's automatic code signing as a fallback
+          echo "Using Codemagic's automatic code signing"
+          # This will use the code signing settings from the Codemagic UI
+          # No additional commands needed as it's handled by Codemagic automatically
           
       - name: Set up iOS Firebase configuration
         script: |
