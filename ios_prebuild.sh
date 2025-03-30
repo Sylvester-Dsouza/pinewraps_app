@@ -3,8 +3,8 @@ set -e
 
 echo "Running iOS prebuild script..."
 
-# Navigate to project directory
-cd $FCI_BUILD_DIR/pinewraps_app
+# Navigate to project directory - removing the nested path since we're already in the right directory
+# cd $FCI_BUILD_DIR/pinewraps_app
 
 # Uncomment sign_in_with_apple for iOS build
 sed -i '' 's/^  # sign_in_with_apple: \^5.0.0$/  sign_in_with_apple: \^5.0.0/' pubspec.yaml
