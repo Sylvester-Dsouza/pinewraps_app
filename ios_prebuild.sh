@@ -34,6 +34,15 @@ echo "Creating Flutter framework symlinks..."
 mkdir -p Pods/Flutter/Flutter.framework/Headers
 ln -sf ../../../Flutter/engine/Flutter.framework/Headers/Flutter.h Pods/Flutter/Flutter.framework/Headers/Flutter.h
 
+# Fix webview_flutter_wkwebview issues
+echo "Fixing webview_flutter_wkwebview issues..."
+WEBVIEW_POD_DIR=$(find . -type d -name "webview_flutter_wkwebview" | head -n 1)
+if [ -n "$WEBVIEW_POD_DIR" ]; then
+  echo "Found webview_flutter_wkwebview at $WEBVIEW_POD_DIR"
+  mkdir -p $WEBVIEW_POD_DIR/Sources/webview_flutter_wkwebview/include/webview_flutter_wkwebview
+  ln -sf ../../../../../Flutter/engine/Flutter.framework/Headers/Flutter.h $WEBVIEW_POD_DIR/Sources/webview_flutter_wkwebview/include/webview_flutter_wkwebview/Flutter.h
+fi
+
 # Return to project root
 cd ..
 
