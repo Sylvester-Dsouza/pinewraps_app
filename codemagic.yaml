@@ -6,61 +6,18 @@ workflows:
       xcode: latest
       cocoapods: default
       flutter: stable
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.pinewraps.app
       vars:
         IOS_BUNDLE_ID: "com.pinewraps.app"
-        APP_STORE_CONNECT_ISSUER_ID: "cdb41442-8b6b-4d6b-b4b8-1409f48a6d49"
-        APP_STORE_CONNECT_KEY_IDENTIFIER: "UY5MG90CRWOW"
     scripts:
-      - name: Set up code signing settings
+      - name: Set up Firebase configuration
         script: |
-          echo "Setting up code signing"
-          # Create temporary keychain
-          keychain initialize
-          
-          # Set up App Store Connect API private key
-          echo "Setting up App Store Connect API private key"
-          cat > $HOME/private_keys/AuthKey_UY5MG90CRWOW.p8 << EOL
-          -----BEGIN PRIVATE KEY-----
-          MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgBCSQC7dNGxINNUtz
-          DtuSWzuyL/SVGFBLyU6NNNSesxyhRANCAAQO6fzAR99mWHdnV+xUQyL735Er48Oi
-          Qw36evOQiDvx6i83T1xOXAO6PpkdSS0oK4zYZGOuv44Mnd24xHrrmKK9
-          -----END PRIVATE KEY-----
-          EOL
-          export APP_STORE_CONNECT_PRIVATE_KEY=$(cat $HOME/private_keys/AuthKey_UY5MG90CRWOW.p8)
-          
-          # Check if we have App Store Connect API credentials
-          if [ -n "$APP_STORE_CONNECT_ISSUER_ID" ] && [ -n "$APP_STORE_CONNECT_KEY_IDENTIFIER" ] && [ -n "$APP_STORE_CONNECT_PRIVATE_KEY" ]; then
-            echo "Using App Store Connect API for code signing"
-            app-store-connect fetch-signing-files "$IOS_BUNDLE_ID" --type IOS_APP_STORE --create
-            keychain add-certificates
-          else
-            echo "App Store Connect API credentials not found. Using manual code signing."
-            # Try to use certificate from environment variable
-            if [ -n "$CERTIFICATE" ] && [ -n "$CERTIFICATE_PASSWORD" ]; then
-              echo "Using certificate from environment variables"
-              echo $CERTIFICATE | base64 --decode > $FCI_BUILD_DIR/certificate.p12
-              keychain add-certificates --certificate $FCI_BUILD_DIR/certificate.p12 --certificate-password $CERTIFICATE_PASSWORD
-            else
-              echo "No code signing credentials found. Build may fail."
-            fi
-          fi
-          
-          # Set up provisioning profile
-          xcode-project use-profiles
-          
-          # Set up Firebase configuration if needed
-          if [ -n "$IOS_FIREBASE_CONFIG" ]; then
-            echo "Setting up Firebase configuration"
-            mkdir -p $FCI_BUILD_DIR/ios/Runner
-            # Check if the variable is valid base64
-            if echo "$IOS_FIREBASE_CONFIG" | base64 -d > /dev/null 2>&1; then
-              echo "Decoding Firebase configuration"
-              echo "$IOS_FIREBASE_CONFIG" | base64 --decode > $FCI_BUILD_DIR/ios/Runner/GoogleService-Info.plist
-              echo "Firebase configuration file created successfully"
-            else
-              echo "Warning: IOS_FIREBASE_CONFIG is not valid base64. Skipping Firebase configuration."
-              # Create the file manually from the known content
-              cat > $FCI_BUILD_DIR/ios/Runner/GoogleService-Info.plist << EOL
+          echo "Setting up Firebase configuration"
+          mkdir -p $FCI_BUILD_DIR/ios/Runner
+          # Create the file manually from the known content
+          cat > $FCI_BUILD_DIR/ios/Runner/GoogleService-Info.plist << EOL
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -98,51 +55,7 @@ workflows:
 </dict>
 </plist>
 EOL
-              echo "Created GoogleService-Info.plist manually"
-            fi
-          else
-            echo "IOS_FIREBASE_CONFIG not set. Creating GoogleService-Info.plist manually."
-            mkdir -p $FCI_BUILD_DIR/ios/Runner
-            cat > $FCI_BUILD_DIR/ios/Runner/GoogleService-Info.plist << EOL
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-	<key>CLIENT_ID</key>
-	<string>181991178384-0768pbr5j4b0svq374ql8jmqm8lha5gi.apps.googleusercontent.com</string>
-	<key>REVERSED_CLIENT_ID</key>
-	<string>com.googleusercontent.apps.181991178384-0768pbr5j4b0svq374ql8jmqm8lha5gi</string>
-	<key>ANDROID_CLIENT_ID</key>
-	<string>181991178384-egso4atj877ghd4c2tgiv9rg2c15715o.apps.googleusercontent.com</string>
-	<key>API_KEY</key>
-	<string>AIzaSyAacRdIMeUJyGAUeEj8Qb2bliZ-tySRCj8</string>
-	<key>GCM_SENDER_ID</key>
-	<string>181991178384</string>
-	<key>PLIST_VERSION</key>
-	<string>1</string>
-	<key>BUNDLE_ID</key>
-	<string>com.pinewraps.app</string>
-	<key>PROJECT_ID</key>
-	<string>pinewraps-23e8a</string>
-	<key>STORAGE_BUCKET</key>
-	<string>pinewraps-23e8a.firebasestorage.app</string>
-	<key>IS_ADS_ENABLED</key>
-	<false></false>
-	<key>IS_ANALYTICS_ENABLED</key>
-	<false></false>
-	<key>IS_APPINVITE_ENABLED</key>
-	<true></true>
-	<key>IS_GCM_ENABLED</key>
-	<true></true>
-	<key>IS_SIGNIN_ENABLED</key>
-	<true></true>
-	<key>GOOGLE_APP_ID</key>
-	<string>1:181991178384:ios:a5699293807394f7485815</string>
-</dict>
-</plist>
-EOL
-            echo "Created GoogleService-Info.plist manually"
-          fi
+          echo "Created GoogleService-Info.plist manually"
           
       - name: Run iOS prebuild script
         script: |
@@ -203,13 +116,13 @@ EOF
           
           # Set up Firebase configuration if needed
           if [ -n "$ANDROID_FIREBASE_CONFIG" ]; then
-            echo "Setting up Firebase configuration"
+            echo "Setting up Android Firebase configuration"
             mkdir -p $FCI_BUILD_DIR/android/app
             # Check if the variable is valid base64
             if echo "$ANDROID_FIREBASE_CONFIG" | base64 -d > /dev/null 2>&1; then
-              echo "Decoding Firebase configuration"
+              echo "Decoding Android Firebase configuration"
               echo "$ANDROID_FIREBASE_CONFIG" | base64 --decode > $FCI_BUILD_DIR/android/app/google-services.json
-              echo "Firebase configuration file created successfully"
+              echo "Android Firebase configuration file created successfully"
             else
               echo "Warning: ANDROID_FIREBASE_CONFIG is not valid base64. Skipping Firebase configuration."
             fi
@@ -236,10 +149,11 @@ EOF
       xcode: latest
       cocoapods: default
       flutter: stable
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.pinewraps.app
       vars:
         IOS_BUNDLE_ID: "com.pinewraps.app"
-        APP_STORE_CONNECT_ISSUER_ID: "cdb41442-8b6b-4d6b-b4b8-1409f48a6d49"
-        APP_STORE_CONNECT_KEY_IDENTIFIER: "UY5MG90CRWOW"
     triggering:
       events:
         - push
@@ -248,54 +162,12 @@ EOF
           include: true
     scripts:
       # iOS setup and build
-      - name: Set up iOS code signing
+      - name: Set up iOS Firebase configuration
         script: |
-          echo "Setting up iOS code signing"
-          keychain initialize
-          
-          # Set up App Store Connect API private key
-          echo "Setting up App Store Connect API private key"
-          cat > $HOME/private_keys/AuthKey_UY5MG90CRWOW.p8 << EOL
-          -----BEGIN PRIVATE KEY-----
-          MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgBCSQC7dNGxINNUtz
-          DtuSWzuyL/SVGFBLyU6NNNSesxyhRANCAAQO6fzAR99mWHdnV+xUQyL735Er48Oi
-          Qw36evOQiDvx6i83T1xOXAO6PpkdSS0oK4zYZGOuv44Mnd24xHrrmKK9
-          -----END PRIVATE KEY-----
-          EOL
-          export APP_STORE_CONNECT_PRIVATE_KEY=$(cat $HOME/private_keys/AuthKey_UY5MG90CRWOW.p8)
-          
-          # Check if we have App Store Connect API credentials
-          if [ -n "$APP_STORE_CONNECT_ISSUER_ID" ] && [ -n "$APP_STORE_CONNECT_KEY_IDENTIFIER" ] && [ -n "$APP_STORE_CONNECT_PRIVATE_KEY" ]; then
-            echo "Using App Store Connect API for code signing"
-            app-store-connect fetch-signing-files "$IOS_BUNDLE_ID" --type IOS_APP_STORE --create
-            keychain add-certificates
-          else
-            echo "App Store Connect API credentials not found. Using manual code signing."
-            # Try to use certificate from environment variable
-            if [ -n "$CERTIFICATE" ] && [ -n "$CERTIFICATE_PASSWORD" ]; then
-              echo "Using certificate from environment variables"
-              echo $CERTIFICATE | base64 --decode > $FCI_BUILD_DIR/certificate.p12
-              keychain add-certificates --certificate $FCI_BUILD_DIR/certificate.p12 --certificate-password $CERTIFICATE_PASSWORD
-            else
-              echo "No code signing credentials found. Build may fail."
-            fi
-          fi
-          
-          xcode-project use-profiles
-          
-          # Set up Firebase configuration if needed
-          if [ -n "$IOS_FIREBASE_CONFIG" ]; then
-            echo "Setting up iOS Firebase configuration"
-            mkdir -p $FCI_BUILD_DIR/ios/Runner
-            # Check if the variable is valid base64
-            if echo "$IOS_FIREBASE_CONFIG" | base64 -d > /dev/null 2>&1; then
-              echo "Decoding iOS Firebase configuration"
-              echo "$IOS_FIREBASE_CONFIG" | base64 --decode > $FCI_BUILD_DIR/ios/Runner/GoogleService-Info.plist
-              echo "iOS Firebase configuration file created successfully"
-            else
-              echo "Warning: IOS_FIREBASE_CONFIG is not valid base64. Skipping Firebase configuration."
-              # Create the file manually from the known content
-              cat > $FCI_BUILD_DIR/ios/Runner/GoogleService-Info.plist << EOL
+          echo "Setting up iOS Firebase configuration"
+          mkdir -p $FCI_BUILD_DIR/ios/Runner
+          # Create the file manually from the known content
+          cat > $FCI_BUILD_DIR/ios/Runner/GoogleService-Info.plist << EOL
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -333,51 +205,7 @@ EOF
 </dict>
 </plist>
 EOL
-              echo "Created GoogleService-Info.plist manually"
-            fi
-          else
-            echo "IOS_FIREBASE_CONFIG not set. Creating GoogleService-Info.plist manually."
-            mkdir -p $FCI_BUILD_DIR/ios/Runner
-            cat > $FCI_BUILD_DIR/ios/Runner/GoogleService-Info.plist << EOL
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-	<key>CLIENT_ID</key>
-	<string>181991178384-0768pbr5j4b0svq374ql8jmqm8lha5gi.apps.googleusercontent.com</string>
-	<key>REVERSED_CLIENT_ID</key>
-	<string>com.googleusercontent.apps.181991178384-0768pbr5j4b0svq374ql8jmqm8lha5gi</string>
-	<key>ANDROID_CLIENT_ID</key>
-	<string>181991178384-egso4atj877ghd4c2tgiv9rg2c15715o.apps.googleusercontent.com</string>
-	<key>API_KEY</key>
-	<string>AIzaSyAacRdIMeUJyGAUeEj8Qb2bliZ-tySRCj8</string>
-	<key>GCM_SENDER_ID</key>
-	<string>181991178384</string>
-	<key>PLIST_VERSION</key>
-	<string>1</string>
-	<key>BUNDLE_ID</key>
-	<string>com.pinewraps.app</string>
-	<key>PROJECT_ID</key>
-	<string>pinewraps-23e8a</string>
-	<key>STORAGE_BUCKET</key>
-	<string>pinewraps-23e8a.firebasestorage.app</string>
-	<key>IS_ADS_ENABLED</key>
-	<false></false>
-	<key>IS_ANALYTICS_ENABLED</key>
-	<false></false>
-	<key>IS_APPINVITE_ENABLED</key>
-	<true></true>
-	<key>IS_GCM_ENABLED</key>
-	<true></true>
-	<key>IS_SIGNIN_ENABLED</key>
-	<true></true>
-	<key>GOOGLE_APP_ID</key>
-	<string>1:181991178384:ios:a5699293807394f7485815</string>
-</dict>
-</plist>
-EOL
-            echo "Created GoogleService-Info.plist manually"
-          fi
+          echo "Created GoogleService-Info.plist manually"
           
       - name: Run iOS prebuild script
         script: |
