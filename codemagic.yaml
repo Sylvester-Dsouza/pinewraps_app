@@ -7,8 +7,8 @@ workflows:
       cocoapods: default
       flutter: stable
       groups:
-        - app_store_credentials
-        - firebase_credentials
+        - ios-credentials
+        - firebase-credentials
       vars:
         IOS_BUNDLE_ID: "com.pinewraps.app"
     scripts:
@@ -57,8 +57,8 @@ workflows:
     environment:
       flutter: stable
       groups:
-        - android_credentials
-        - firebase_credentials
+        - android-credentials
+        - firebase-credentials
     scripts:
       - name: Set up keystore
         script: |
@@ -99,9 +99,9 @@ workflows:
       cocoapods: default
       flutter: stable
       groups:
-        - ios_credentials
-        - android_credentials
-        - firebase_credentials
+        - ios-credentials
+        - android-credentials
+        - firebase-credentials
       vars:
         IOS_BUNDLE_ID: "com.pinewraps.app"
     triggering:
