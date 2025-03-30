@@ -3,9 +3,6 @@ set -e
 
 echo "Running iOS prebuild script..."
 
-# Navigate to project directory - removing the nested path since we're already in the right directory
-# cd $FCI_BUILD_DIR/pinewraps_app
-
 # Uncomment sign_in_with_apple for iOS build
 sed -i '' 's/^  # sign_in_with_apple: \^5.0.0$/  sign_in_with_apple: \^5.0.0/' pubspec.yaml
 
@@ -19,51 +16,32 @@ flutter pub get
 
 # Fix iOS build issues
 echo "Fixing iOS build environment..."
+
+# Navigate to iOS directory
 cd ios
 
-# Update CocoaPods repos
-echo "Updating CocoaPods repositories..."
-pod repo update
+# Install pods
+echo "Installing CocoaPods dependencies..."
+pod install
 
-# Install pods with repo update
-echo "Installing pods with repo update..."
-pod install --repo-update
-
-# Create Flutter symlinks to fix header issues
-echo "Creating Flutter framework symlinks..."
-mkdir -p Pods/Flutter/Flutter.framework/Headers
-ln -sf ../../../Flutter/engine/Flutter.framework/Headers/Flutter.h Pods/Flutter/Flutter.framework/Headers/Flutter.h
-
-# Fix webview_flutter_wkwebview issues
+# Fix webview_flutter_wkwebview symlink issue
 echo "Fixing webview_flutter_wkwebview issues..."
-WEBVIEW_POD_DIR=$(find . -type d -name "webview_flutter_wkwebview" | head -n 1)
-if [ -n "$WEBVIEW_POD_DIR" ]; then
-  echo "Found webview_flutter_wkwebview at $WEBVIEW_POD_DIR"
-  mkdir -p $WEBVIEW_POD_DIR/Sources/webview_flutter_wkwebview/include/webview_flutter_wkwebview
-  ln -sf ../../../../../Flutter/engine/Flutter.framework/Headers/Flutter.h $WEBVIEW_POD_DIR/Sources/webview_flutter_wkwebview/include/webview_flutter_wkwebview/Flutter.h
+WEBVIEW_DIR="./Pods/Target Support Files/webview_flutter_wkwebview"
+if [ -d "$WEBVIEW_DIR" ]; then
+  echo "Found webview_flutter_wkwebview at $WEBVIEW_DIR"
+  
+  # Create the directory structure if it doesn't exist
+  mkdir -p "./Pods/webview_flutter_wkwebview/Sources/webview_flutter_wkwebview/include/webview_flutter_wkwebview"
+  
+  # Create an empty Flutter.h file if it doesn't exist
+  touch "./Pods/webview_flutter_wkwebview/Sources/webview_flutter_wkwebview/include/webview_flutter_wkwebview/Flutter.h"
+  
+  echo "Created missing Flutter.h file for webview_flutter_wkwebview"
+else
+  echo "webview_flutter_wkwebview directory not found, skipping fix"
 fi
 
-# Fix sqflite_darwin issues
-echo "Fixing sqflite_darwin issues..."
-SQFLITE_POD_DIR=$(find . -type d -name "sqflite_darwin" | head -n 1)
-if [ -n "$SQFLITE_POD_DIR" ]; then
-  echo "Found sqflite_darwin at $SQFLITE_POD_DIR"
-  mkdir -p $SQFLITE_POD_DIR/Sources/sqflite_darwin/include/sqflite_darwin
-  ln -sf ../../../../../Flutter/engine/Flutter.framework/Headers/Flutter.h $SQFLITE_POD_DIR/Sources/sqflite_darwin/include/sqflite_darwin/Flutter.h
-fi
-
-# Fix any other potential Flutter.h issues by creating symlinks in all plugin directories
-echo "Creating Flutter.h symlinks in all plugin directories..."
-find . -type d -name "Sources" | while read sources_dir; do
-  include_dir="$sources_dir/$(basename $(dirname $sources_dir))/include/$(basename $(dirname $sources_dir))"
-  if [ -d "$include_dir" ]; then
-    echo "Creating symlink in $include_dir"
-    mkdir -p "$include_dir"
-    ln -sf ../../../../../Flutter/engine/Flutter.framework/Headers/Flutter.h "$include_dir/Flutter.h"
-  fi
-done
-
-# Return to project root
+# Return to the project root
 cd ..
 
 echo "iOS prebuild script completed successfully"
