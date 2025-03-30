@@ -6,7 +6,9 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
-import 'package:sign_in_with_apple/sign_in_with_apple.dart';
+// Temporarily commented out for Android build
+// import 'package:sign_in_with_apple/sign_in_with_apple.dart';
+// import 'auth_service_platform.dart' if (dart.library.io) 'auth_service_stub.dart';
 import 'api_service.dart';
 import 'notification_service.dart';
 import 'cart_service.dart';
@@ -367,113 +369,47 @@ class AuthService extends ChangeNotifier {
 
   Future<Map<String, dynamic>> signInWithApple() async {
     try {
+      // Apple Sign-In is temporarily disabled for Android build
+      throw ApiException(
+        message: 'Apple Sign In is temporarily unavailable',
+        statusCode: 400,
+      );
+      
+      // The following code is commented out temporarily for Android build
+      /*
+      // Only allow Apple Sign-In on iOS
+      if (defaultTargetPlatform != TargetPlatform.iOS) {
+        throw ApiException(
+          message: 'Apple Sign In is only available on iOS devices',
+          statusCode: 400,
+        );
+      }
+      
       // To prevent replay attacks, we use a nonce which is a random string
       final rawNonce = _generateNonce();
       final nonce = _sha256ofString(rawNonce);
 
-      // Check platform
-      if (defaultTargetPlatform == TargetPlatform.iOS) {
-        // iOS implementation
-        final appleCredential = await SignInWithApple.getAppleIDCredential(
-          scopes: [
-            AppleIDAuthorizationScopes.email,
-            AppleIDAuthorizationScopes.fullName,
-          ],
-          nonce: nonce,
-        );
-
-        print('Apple Sign In credential obtained on iOS');
-
-        // Create OAuthCredential
-        final oauthCredential = OAuthProvider("apple.com").credential(
-          idToken: appleCredential.identityToken,
-          rawNonce: rawNonce,
-        );
-
-        // Sign in with Firebase
-        return _completeAppleSignIn(oauthCredential, appleCredential.givenName, appleCredential.familyName);
-      } else {
-        // Android implementation - use Firebase directly
-        print('Using Firebase Apple provider directly on Android');
-        
-        // Create Apple auth provider
-        final appleProvider = OAuthProvider('apple.com');
-        appleProvider.addScope('email');
-        appleProvider.addScope('name');
-        appleProvider.setCustomParameters({
-          'nonce': nonce,
-        });
-
-        try {
-          // Sign in with Firebase using signInWithProvider (works on mobile)
-          final authResult = await _auth.signInWithProvider(appleProvider);
-          final user = authResult.user;
-          final additionalUserInfo = authResult.additionalUserInfo;
-          
-          if (user == null) {
-            throw ApiException(
-              message: 'Failed to authenticate with Firebase',
-              statusCode: 401,
-            );
-          }
-
-          // Extract name from profile if available
-          String? firstName;
-          String? lastName;
-          
-          if (additionalUserInfo?.profile != null) {
-            final profile = additionalUserInfo!.profile!;
-            if (profile.containsKey('name')) {
-              final name = profile['name'];
-              if (name is String) {
-                final nameParts = name.split(' ');
-                firstName = nameParts.isNotEmpty ? nameParts.first : null;
-                lastName = nameParts.length > 1 ? nameParts.sublist(1).join(' ') : null;
-              }
-            }
-          }
-
-          // Create credential for completion
-          final credential = OAuthProvider('apple.com').credential();
-          return _completeAppleSignIn(credential, firstName, lastName);
-        } catch (e) {
-          print('Error with direct Firebase Apple Sign In: $e');
-          
-          // Fallback to web authentication for Android
-          print('Falling back to web authentication for Android');
-          final appleCredential = await SignInWithApple.getAppleIDCredential(
-            scopes: [
-              AppleIDAuthorizationScopes.email,
-              AppleIDAuthorizationScopes.fullName,
-            ],
-            nonce: nonce,
-            webAuthenticationOptions: WebAuthenticationOptions(
-              clientId: 'com.pinewraps.app',
-              redirectUri: Uri.parse(
-                'https://pinewraps-api.onrender.com/auth/apple/callback',
-              ),
-            ),
-          );
-
-          print('Apple Sign In credential obtained via web authentication');
-
-          // Create OAuthCredential
-          final oauthCredential = OAuthProvider("apple.com").credential(
-            idToken: appleCredential.identityToken,
-            rawNonce: rawNonce,
-          );
-
-          // Sign in with Firebase
-          return _completeAppleSignIn(oauthCredential, appleCredential.givenName, appleCredential.familyName);
-        }
-      }
-    } on SignInWithAppleException catch (e) {
-      print('Apple Sign In Exception: ${e.toString()}');
-      throw ApiException(
-        message: 'Apple Sign In failed: ${e.toString()}',
-        statusCode: 401,
+      // iOS implementation
+      final appleCredential = await SignInWithApple.getAppleIDCredential(
+        scopes: [
+          AppleIDAuthorizationScopes.email,
+          AppleIDAuthorizationScopes.fullName,
+        ],
+        nonce: nonce,
       );
-    } catch (e) {
+
+      print('Apple Sign In credential obtained on iOS');
+
+      // Create OAuthCredential
+      final oauthCredential = OAuthProvider("apple.com").credential(
+        idToken: appleCredential.identityToken,
+        rawNonce: rawNonce,
+      );
+
+      // Sign in with Firebase
+      return _completeAppleSignIn(oauthCredential, appleCredential.givenName, appleCredential.familyName);
+      */
+    } on Exception catch (e) {
       print('Error signing in with Apple: $e');
       throw ApiException(
         message: 'Failed to sign in with Apple: ${e.toString()}',

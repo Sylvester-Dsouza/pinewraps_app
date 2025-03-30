@@ -32,3 +32,7 @@
 
 # Keep your model classes
 -keep class com.pinewraps.app.models.** { *; }
+
+# Exclude sign_in_with_apple plugin
+-dontwarn com.aboutyou.dart_packages.sign_in_with_apple.**
+-keep class com.aboutyou.dart_packages.sign_in_with_apple.** { *; }

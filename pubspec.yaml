@@ -1,5 +1,5 @@
 name: pinewraps_app
-description: "Mobile app for Pinewraps - Sustainable Packaging Solutions"
+description: "Mobile app for Pinewraps - Flowers & Cakes"
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
@@ -49,7 +49,8 @@ dependencies:
   app_links: ^3.4.5
   path_provider: ^2.1.1
   open_file: ^3.3.2
-  sign_in_with_apple: ^5.0.0
+  # Temporarily commented out for Android build
+  # sign_in_with_apple: ^5.0.0
   crypto: ^3.0.3
   font_awesome_flutter: ^9.2.0
   whatsapp_unilink: ^2.1.0

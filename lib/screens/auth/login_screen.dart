@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show defaultTargetPlatform, TargetPlatform;
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../services/auth_service.dart';
 import '../../services/api_service.dart';
@@ -376,16 +377,19 @@ class _LoginScreenState extends State<LoginScreen> {
                   label: Text('Continue with Google', style: AuthStyles.buttonTextStyle),
                 ),
                 const SizedBox(height: 16),
-                OutlinedButton.icon(
-                  onPressed: _isLoading ? null : _signInWithApple,
-                  style: AuthStyles.outlinedButtonStyle,
-                  icon: Image.asset(
-                    'assets/images/apple.png',
-                    height: 20,
+                // Only show Apple Sign-In button on iOS
+                if (defaultTargetPlatform == TargetPlatform.iOS) ...[
+                  OutlinedButton.icon(
+                    onPressed: _isLoading ? null : _signInWithApple,
+                    style: AuthStyles.outlinedButtonStyle,
+                    icon: Image.asset(
+                      'assets/images/apple.png',
+                      height: 20,
+                    ),
+                    label: Text('Continue with Apple', style: AuthStyles.buttonTextStyle),
                   ),
-                  label: Text('Continue with Apple', style: AuthStyles.buttonTextStyle),
-                ),
-                const SizedBox(height: 16),
+                  const SizedBox(height: 16),
+                ],
                 OutlinedButton.icon(
                   onPressed: null, // Disabled for now
                   style: AuthStyles.outlinedButtonStyle,
