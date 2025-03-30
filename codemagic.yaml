@@ -20,9 +20,20 @@ workflows:
           echo "Setting up automatic code signing with App Store Connect API"
           if [ -n "$APP_STORE_CONNECT_ISSUER_ID" ] && [ -n "$APP_STORE_CONNECT_KEY_IDENTIFIER" ] && [ -n "$APP_STORE_CONNECT_PRIVATE_KEY" ]; then
             echo "Using App Store Connect API for code signing"
+            # First, create the app in App Store Connect if it doesn't exist
+            app-store-connect create-app "$IOS_BUNDLE_ID" "Pinewraps" --skip-if-exists
+            
+            # Then fetch or create the signing files
             app-store-connect fetch-signing-files "$IOS_BUNDLE_ID" --type IOS_APP_STORE --create
+            
+            # Check if the profile was created successfully
+            if [ $? -ne 0 ]; then
+              echo "Failed to fetch or create provisioning profile. Please check your App Store Connect API credentials."
+              exit 1
+            fi
           else
-            echo "Warning: App Store Connect API credentials not found. Code signing may fail."
+            echo "Error: App Store Connect API credentials not found. Cannot proceed with automatic code signing."
+            exit 1
           fi
           
       - name: Set up Firebase configuration
@@ -154,7 +165,6 @@ workflows:
       - build/app/outputs/flutter-apk/*.apk
       - build/app/outputs/bundle/release/*.aab
       
-  # Combined workflow that builds both iOS and Android
   combined-workflow:
     name: iOS and Android Build
     instance_type: mac_mini_m1
@@ -183,9 +193,20 @@ workflows:
           echo "Setting up automatic code signing with App Store Connect API"
           if [ -n "$APP_STORE_CONNECT_ISSUER_ID" ] && [ -n "$APP_STORE_CONNECT_KEY_IDENTIFIER" ] && [ -n "$APP_STORE_CONNECT_PRIVATE_KEY" ]; then
             echo "Using App Store Connect API for code signing"
+            # First, create the app in App Store Connect if it doesn't exist
+            app-store-connect create-app "$IOS_BUNDLE_ID" "Pinewraps" --skip-if-exists
+            
+            # Then fetch or create the signing files
             app-store-connect fetch-signing-files "$IOS_BUNDLE_ID" --type IOS_APP_STORE --create
+            
+            # Check if the profile was created successfully
+            if [ $? -ne 0 ]; then
+              echo "Failed to fetch or create provisioning profile. Please check your App Store Connect API credentials."
+              exit 1
+            fi
           else
-            echo "Warning: App Store Connect API credentials not found. Code signing may fail."
+            echo "Error: App Store Connect API credentials not found. Cannot proceed with automatic code signing."
+            exit 1
           fi
           
       - name: Set up iOS Firebase configuration
