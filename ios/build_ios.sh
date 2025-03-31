@@ -133,6 +133,30 @@ else
   echo "Could not find open_file_ios plugin"
 fi
 
+# Check for Swift plugins that might have issues
+echo "Checking Swift plugins for potential issues..."
+SWIFT_PLUGINS=("webview_flutter_wkwebview" "url_launcher_ios" "sign_in_with_apple")
+
+for plugin in "${SWIFT_PLUGINS[@]}"; do
+  PLUGIN_PATH=$(find ~/.pub-cache/hosted/pub.dev -name "${plugin}-*" -type d | head -n 1)
+  
+  if [ -n "$PLUGIN_PATH" ]; then
+    echo "Found $plugin at: $PLUGIN_PATH"
+    
+    # Check if there's a Swift module
+    if [ -d "$PLUGIN_PATH/ios" ]; then
+      echo "Checking $plugin iOS directory"
+      
+      # Make sure all Swift files have the correct permissions
+      find "$PLUGIN_PATH/ios" -name "*.swift" -exec chmod +r {} \;
+      
+      echo "Fixed permissions for $plugin Swift files"
+    fi
+  else
+    echo "Could not find $plugin plugin"
+  fi
+done
+
 # Prepare iOS build environment
 echo "Preparing iOS build environment"
 cd ios
@@ -158,6 +182,16 @@ else
   echo "WARNING: FirebaseCore not found in Pods"
 fi
 
+# Check for Swift plugins in Pods
+echo "Checking Swift plugins in Pods..."
+for plugin in "${SWIFT_PLUGINS[@]}"; do
+  if [ -d "Pods/$plugin" ]; then
+    echo "$plugin found in Pods"
+  else
+    echo "WARNING: $plugin not found in Pods"
+  fi
+done
+
 # Return to project root
 cd ..
 
@@ -181,6 +215,8 @@ xcodebuild clean archive \
   GCC_PREPROCESSOR_DEFINITIONS="SQLITE_ENABLE_COLUMN_METADATA=1 \$(inherited)" \
   SWIFT_VERSION=5.0 \
   SWIFT_OBJC_BRIDGING_HEADER="Runner/Runner-Bridging-Header.h" \
+  ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES=YES \
+  ENABLE_BITCODE=NO \
   -allowProvisioningUpdates
 
 # Check if archive was created

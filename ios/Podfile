@@ -77,6 +77,28 @@ target 'Runner' do
         end
       end
       
+      # Fix Swift compilation issues for specific plugins
+      if ['webview_flutter_wkwebview', 'url_launcher_ios', 'sign_in_with_apple'].include?(target.name)
+        target.build_configurations.each do |config|
+          # Ensure Swift version is set correctly
+          config.build_settings['SWIFT_VERSION'] = '5.0'
+          
+          # Ensure Swift standard libraries are linked
+          config.build_settings['ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES'] = 'YES'
+          
+          # Set proper Swift optimization level for Release
+          if config.name == 'Release'
+            config.build_settings['SWIFT_OPTIMIZATION_LEVEL'] = '-Owholemodule'
+          end
+          
+          # Ensure proper Swift compilation mode
+          config.build_settings['SWIFT_COMPILATION_MODE'] = 'wholemodule'
+          
+          # Disable bitcode for these targets
+          config.build_settings['ENABLE_BITCODE'] = 'NO'
+        end
+      end
+      
       # Fix for all targets
       target.build_configurations.each do |config|
         config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '12.0'

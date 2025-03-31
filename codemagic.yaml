@@ -136,11 +136,39 @@ workflows:
           EOF
           echo "Created GoogleService-Info.plist manually"
           
-      - name: Run iOS prebuild script
+      - name: iOS Prebuild Script
         script: |
-          echo "Running iOS prebuild script"
+          cd "${FCI_BUILD_DIR}"
+          
+          # Make sure the prebuild script is executable
           chmod +x "${FCI_BUILD_DIR}/ios_prebuild.sh"
+          
+          # Run the prebuild script
           "${FCI_BUILD_DIR}/ios_prebuild.sh"
+          
+          # Ensure Swift plugins are properly set up
+          echo "Setting up Swift plugins..."
+          SWIFT_PLUGINS=("webview_flutter_wkwebview" "url_launcher_ios" "sign_in_with_apple")
+          
+          for plugin in "${SWIFT_PLUGINS[@]}"; do
+            PLUGIN_PATH=$(find ~/.pub-cache/hosted/pub.dev -name "${plugin}-*" -type d | head -n 1)
+            
+            if [ -n "$PLUGIN_PATH" ]; then
+              echo "Found $plugin at: $PLUGIN_PATH"
+              
+              # Check if there's a Swift module
+              if [ -d "$PLUGIN_PATH/ios" ]; then
+                echo "Checking $plugin iOS directory"
+                
+                # Make sure all Swift files have the correct permissions
+                find "$PLUGIN_PATH/ios" -name "*.swift" -exec chmod +r {} \;
+                
+                echo "Fixed permissions for $plugin Swift files"
+              fi
+            else
+              echo "Could not find $plugin plugin"
+            fi
+          done
           
       - name: Flutter build iOS
         script: |
@@ -412,11 +440,39 @@ workflows:
           EOF
           echo "Created GoogleService-Info.plist manually"
           
-      - name: Run iOS prebuild script
+      - name: iOS Prebuild Script
         script: |
-          echo "Running iOS prebuild script"
+          cd "${FCI_BUILD_DIR}"
+          
+          # Make sure the prebuild script is executable
           chmod +x "${FCI_BUILD_DIR}/ios_prebuild.sh"
+          
+          # Run the prebuild script
           "${FCI_BUILD_DIR}/ios_prebuild.sh"
+          
+          # Ensure Swift plugins are properly set up
+          echo "Setting up Swift plugins..."
+          SWIFT_PLUGINS=("webview_flutter_wkwebview" "url_launcher_ios" "sign_in_with_apple")
+          
+          for plugin in "${SWIFT_PLUGINS[@]}"; do
+            PLUGIN_PATH=$(find ~/.pub-cache/hosted/pub.dev -name "${plugin}-*" -type d | head -n 1)
+            
+            if [ -n "$PLUGIN_PATH" ]; then
+              echo "Found $plugin at: $PLUGIN_PATH"
+              
+              # Check if there's a Swift module
+              if [ -d "$PLUGIN_PATH/ios" ]; then
+                echo "Checking $plugin iOS directory"
+                
+                # Make sure all Swift files have the correct permissions
+                find "$PLUGIN_PATH/ios" -name "*.swift" -exec chmod +r {} \;
+                
+                echo "Fixed permissions for $plugin Swift files"
+              fi
+            else
+              echo "Could not find $plugin plugin"
+            fi
+          done
           
       - name: Flutter build iOS
         script: |
