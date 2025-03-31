@@ -6,8 +6,9 @@ echo "Running iOS prebuild script..."
 # Uncomment sign_in_with_apple for iOS build
 sed -i '' 's/^  # sign_in_with_apple: \^5.0.0$/  sign_in_with_apple: \^5.0.0/' pubspec.yaml
 
-# Skip Flutter clean and pub get as they're already run in the main build script
-echo "Skipping Flutter clean and pub get (already run in main script)"
+# We need to run flutter pub get to generate the Flutter/Generated.xcconfig file
+echo "Running flutter pub get to generate necessary config files..."
+flutter pub get
 
 # Fix iOS build issues
 echo "Fixing iOS build environment..."

@@ -149,8 +149,10 @@ workflows:
           # Skip flutter clean and pub get as they're already run in the prebuild script
           echo "Building iOS app"
           
-          # Run the build_ios.sh script
+          # Make sure the build script is executable
           chmod +x "${FCI_BUILD_DIR}/ios/build_ios.sh"
+          
+          # Run the build script
           "${FCI_BUILD_DIR}/ios/build_ios.sh"
           
           # Create a directory for the IPA
@@ -417,8 +419,10 @@ workflows:
           # Skip flutter clean and pub get as they're already run in the prebuild script
           echo "Building iOS app"
           
-          # Run the build_ios.sh script
+          # Make sure the build script is executable
           chmod +x "${FCI_BUILD_DIR}/ios/build_ios.sh"
+          
+          # Run the build script
           "${FCI_BUILD_DIR}/ios/build_ios.sh"
           
           # Create a directory for the IPA

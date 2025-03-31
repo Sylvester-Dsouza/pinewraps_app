@@ -5,10 +5,8 @@ set -e
 echo "Setting up Flutter project"
 cd "$FCI_BUILD_DIR"
 
-# Get Flutter dependencies
-echo "Getting Flutter dependencies"
-flutter clean
-flutter pub get
+# Skip Flutter clean and pub get as they're already run in the prebuild script
+echo "Skipping Flutter clean and pub get (already run in prebuild script)"
 
 # Find and patch the sqflite_darwin plugin
 echo "Finding and patching sqflite_darwin plugin"
