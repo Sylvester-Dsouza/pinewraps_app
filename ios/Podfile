@@ -43,64 +43,16 @@ target 'Runner' do
   
   # Disable code signing for pods
   post_install do |installer|
-    # Special fix for Codemagic build issues
-    installer.pods_project.build_configurations.each do |config|
-      config.build_settings["EXCLUDED_ARCHS[sdk=iphonesimulator*]"] = "arm64"
-      config.build_settings['ONLY_ACTIVE_ARCH'] = 'YES'
-      
-      # Ensure automatic signing for all pods
-      config.build_settings['CODE_SIGN_IDENTITY'] = ""
-      config.build_settings['CODE_SIGNING_REQUIRED'] = "NO"
-      config.build_settings['CODE_SIGNING_ALLOWED'] = "NO"
-      config.build_settings['PROVISIONING_PROFILE_SPECIFIER'] = ""
-    end
-    
+    # This is necessary for Xcode 14+
     installer.pods_project.targets.each do |target|
       target.build_configurations.each do |config|
-        # Ensure automatic signing for all pods
-        config.build_settings['CODE_SIGN_IDENTITY'] = ""
-        config.build_settings['CODE_SIGNING_REQUIRED'] = "NO"
-        config.build_settings['CODE_SIGNING_ALLOWED'] = "NO"
-        config.build_settings['PROVISIONING_PROFILE_SPECIFIER'] = ""
-        config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '13.0'
-        
-        # Fix for modular header issues with Firebase
-        config.build_settings['CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES'] = 'YES'
-        
-        # Fix for Firebase Messaging header issue
-        if target.name.start_with?('Firebase')
-          config.build_settings['DEFINES_MODULE'] = 'YES'
-        end
-        
-        # Fix for webview_flutter_wkwebview 'Flutter/Flutter.h' file not found error
-        if target.name.include?('webview_flutter') || target.name.include?('FWF')
-          # Add Flutter framework search paths
-          config.build_settings['FRAMEWORK_SEARCH_PATHS'] ||= ['$(inherited)']
-          config.build_settings['FRAMEWORK_SEARCH_PATHS'] << "${PODS_ROOT}/../Flutter"
-          config.build_settings['FRAMEWORK_SEARCH_PATHS'] << "${PODS_CONFIGURATION_BUILD_DIR}/Flutter"
-          config.build_settings['FRAMEWORK_SEARCH_PATHS'] << "${PODS_ROOT}/../../Flutter"
-          config.build_settings['FRAMEWORK_SEARCH_PATHS'] << "${PODS_ROOT}/../../../Flutter"
-          config.build_settings['FRAMEWORK_SEARCH_PATHS'] << "${FLUTTER_ROOT}/bin/cache/artifacts/engine/ios"
-          
-          # Add header search paths
-          config.build_settings['HEADER_SEARCH_PATHS'] ||= ['$(inherited)']
-          config.build_settings['HEADER_SEARCH_PATHS'] << "${PODS_ROOT}/Headers/Public/Flutter"
-          config.build_settings['HEADER_SEARCH_PATHS'] << "${PODS_ROOT}/../Headers/Public/Flutter"
-          config.build_settings['HEADER_SEARCH_PATHS'] << "${PODS_ROOT}/../../Headers/Public/Flutter"
-          config.build_settings['HEADER_SEARCH_PATHS'] << "${FLUTTER_ROOT}/bin/cache/artifacts/engine/ios/Flutter.xcframework/ios-arm64_armv7/Flutter.framework/Headers"
-          
-          # Disable use of modules for Flutter headers
-          config.build_settings['CLANG_MODULES_AUTOLINK'] = 'YES'
-          config.build_settings['DEFINES_MODULE'] = 'YES'
-          config.build_settings['SWIFT_INSTALL_OBJC_HEADER'] = 'YES'
-          
-          # Disable module validation for this target
-          config.build_settings['CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER'] = 'NO'
-          
-          # Force include the Flutter header directory
-          config.build_settings['OTHER_CFLAGS'] ||= ['$(inherited)']
-          config.build_settings['OTHER_CFLAGS'] << "-I${PODS_ROOT}/Headers/Public/Flutter"
-        end
+        # Ensure all pods use automatic signing
+        config.build_settings['CODE_SIGN_STYLE'] = 'Automatic'
+        config.build_settings['DEVELOPMENT_TEAM'] = '4J9WXB52YV'
+        config.build_settings['CODE_SIGN_IDENTITY'] = ''
+        config.build_settings['CODE_SIGNING_REQUIRED'] = 'NO'
+        config.build_settings['CODE_SIGNING_ALLOWED'] = 'NO'
+        config.build_settings['PROVISIONING_PROFILE_SPECIFIER'] = ''
         
         # Fix for all targets to ensure Flutter.h can be found
         config.build_settings['FRAMEWORK_SEARCH_PATHS'] ||= ['$(inherited)']

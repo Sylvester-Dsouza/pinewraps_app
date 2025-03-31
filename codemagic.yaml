@@ -41,13 +41,31 @@ workflows:
               echo "Bundle ID already exists"
             fi
             
+            # Create keychain
+            echo "Creating keychain"
+            keychain_name="ios-build.keychain"
+            keychain_password="temporary_password"
+            security create-keychain -p "$keychain_password" "$keychain_name"
+            security list-keychains -d user -s "$keychain_name" $(security list-keychains -d user | sed s/\"//g)
+            security default-keychain -s "$keychain_name"
+            security unlock-keychain -p "$keychain_password" "$keychain_name"
+            security set-keychain-settings
+            
             # Fetch or create the development signing files
             echo "Fetching or creating development signing files..."
-            app-store-connect fetch-signing-files --issuer-id "${APP_STORE_CONNECT_ISSUER_ID}" --key-id "${APP_STORE_CONNECT_KEY_IDENTIFIER}" --private-key "${PRIVATE_KEY_PATH}" --type IOS_APP_DEVELOPMENT --create "${IOS_BUNDLE_ID}"
+            app-store-connect fetch-signing-files com.pinewraps.app \
+              --type IOS_APP_DEVELOPMENT \
+              --create \
+              --save-keychain-password "$keychain_password" \
+              --keychain "$keychain_name"
             
             # Fetch or create the distribution signing files
             echo "Fetching or creating distribution signing files..."
-            app-store-connect fetch-signing-files --issuer-id "${APP_STORE_CONNECT_ISSUER_ID}" --key-id "${APP_STORE_CONNECT_KEY_IDENTIFIER}" --private-key "${PRIVATE_KEY_PATH}" --type IOS_APP_STORE --create "${IOS_BUNDLE_ID}"
+            app-store-connect fetch-signing-files com.pinewraps.app \
+              --type IOS_APP_STORE \
+              --create \
+              --save-keychain-password "$keychain_password" \
+              --keychain "$keychain_name"
             
             # Clean up the temporary file
             rm "${PRIVATE_KEY_PATH}"
@@ -155,7 +173,8 @@ workflows:
             -sdk iphoneos \
             -archivePath "$FCI_BUILD_DIR/build/ios/archive/Runner.xcarchive" \
             DEVELOPMENT_TEAM="4J9WXB52YV" \
-            CODE_SIGN_STYLE="Automatic"
+            CODE_SIGN_STYLE="Automatic" \
+            -allowProvisioningUpdates
           
           # Check if archive was created
           if [ -d "$FCI_BUILD_DIR/build/ios/archive/Runner.xcarchive" ]; then
@@ -291,63 +310,31 @@ workflows:
           include: true
     scripts:
       # iOS setup and build
-      - name: Set up iOS code signing
+      - name: Set up code signing settings on Xcode project
         script: |
-          echo "Setting up code signing for iOS"
-          # Initialize keychain
-          keychain initialize
+          cd "$FCI_BUILD_DIR"
           
-          # Use App Store Connect API for code signing
-          if [ -n "${APP_STORE_CONNECT_ISSUER_ID}" ] && [ -n "${APP_STORE_CONNECT_KEY_IDENTIFIER}" ] && [ -n "${APP_STORE_CONNECT_PRIVATE_KEY}" ]; then
-            echo "Using App Store Connect API for code signing"
-            
-            # Create a temporary file for the private key
-            PRIVATE_KEY_PATH=$(mktemp)
-            echo "${APP_STORE_CONNECT_PRIVATE_KEY}" > "${PRIVATE_KEY_PATH}"
-            
-            # Check if bundle ID exists
-            echo "Checking if bundle ID exists..."
-            app-store-connect bundle-ids --issuer-id "${APP_STORE_CONNECT_ISSUER_ID}" --key-id "${APP_STORE_CONNECT_KEY_IDENTIFIER}" --private-key "${PRIVATE_KEY_PATH}" | grep -q "${IOS_BUNDLE_ID}"
-            
-            # If bundle ID doesn't exist, create it
-            if [ $? -ne 0 ]; then
-              echo "Creating bundle ID..."
-              app-store-connect create-bundle-id --issuer-id "${APP_STORE_CONNECT_ISSUER_ID}" --key-id "${APP_STORE_CONNECT_KEY_IDENTIFIER}" --private-key "${PRIVATE_KEY_PATH}" --name "Pinewraps" --platform IOS "${IOS_BUNDLE_ID}"
-            else
-              echo "Bundle ID already exists"
-            fi
-            
-            # Fetch or create the development signing files
-            echo "Fetching or creating development signing files..."
-            app-store-connect fetch-signing-files --issuer-id "${APP_STORE_CONNECT_ISSUER_ID}" --key-id "${APP_STORE_CONNECT_KEY_IDENTIFIER}" --private-key "${PRIVATE_KEY_PATH}" --type IOS_APP_DEVELOPMENT --create "${IOS_BUNDLE_ID}"
-            
-            # Fetch or create the distribution signing files
-            echo "Fetching or creating distribution signing files..."
-            app-store-connect fetch-signing-files --issuer-id "${APP_STORE_CONNECT_ISSUER_ID}" --key-id "${APP_STORE_CONNECT_KEY_IDENTIFIER}" --private-key "${PRIVATE_KEY_PATH}" --type IOS_APP_STORE --create "${IOS_BUNDLE_ID}"
-            
-            # Clean up the temporary file
-            rm "${PRIVATE_KEY_PATH}"
-            
-            # Check if the profiles were created successfully
-            if [ $? -eq 0 ]; then
-              echo "Successfully set up code signing with App Store Connect API"
-              
-              # List available certificates
-              echo "Available certificates:"
-              security find-identity -v -p codesigning
-              
-              # List available provisioning profiles
-              echo "Available provisioning profiles:"
-              ls -la ~/Library/MobileDevice/Provisioning\ Profiles/
-            else
-              echo "Failed to fetch or create provisioning profile. Please check your App Store Connect API credentials."
-              echo "Make sure your Apple Developer account has the necessary permissions."
-              exit 1
-            fi
-          else
-            echo "Error: App Store Connect API credentials not found. Cannot proceed with code signing."
-            exit 1
-          fi
+          # Create keychain
+          echo "Creating keychain"
+          keychain_name="ios-build.keychain"
+          keychain_password="temporary_password"
+          security create-keychain -p "$keychain_password" "$keychain_name"
+          security list-keychains -d user -s "$keychain_name" $(security list-keychains -d user | sed s/\"//g)
+          security default-keychain -s "$keychain_name"
+          security unlock-keychain -p "$keychain_password" "$keychain_name"
+          security set-keychain-settings
+          
+          # Use app-store-connect to fetch signing files
+          echo "Fetching signing files"
+          app-store-connect fetch-signing-files com.pinewraps.app \
+            --type IOS_APP_STORE \
+            --create \
+            --save-keychain-password "$keychain_password" \
+            --keychain "$keychain_name"
+          
+          # Set up code signing settings on Xcode project
+          echo "Setting up code signing settings on Xcode project"
+          xcode-project use-profiles --project ios/Runner.xcodeproj
           
       - name: Set up iOS Firebase configuration
         script: |
@@ -431,7 +418,8 @@ workflows:
             -sdk iphoneos \
             -archivePath "$FCI_BUILD_DIR/build/ios/archive/Runner.xcarchive" \
             DEVELOPMENT_TEAM="4J9WXB52YV" \
-            CODE_SIGN_STYLE="Automatic"
+            CODE_SIGN_STYLE="Automatic" \
+            -allowProvisioningUpdates
           
           # Check if archive was created
           if [ -d "$FCI_BUILD_DIR/build/ios/archive/Runner.xcarchive" ]; then
