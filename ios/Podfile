@@ -51,9 +51,8 @@ target 'Runner' do
     
     installer.pods_project.targets.each do |target|
       target.build_configurations.each do |config|
-        config.build_settings['EXPANDED_CODE_SIGN_IDENTITY'] = ""
-        config.build_settings['CODE_SIGNING_REQUIRED'] = "NO"
-        config.build_settings['CODE_SIGNING_ALLOWED'] = "NO"
+        # Don't disable code signing completely as it can cause issues with Codemagic
+        # Instead, let Codemagic handle code signing
         config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '13.0'
         
         # Fix for modular header issues with Firebase
@@ -64,7 +63,7 @@ target 'Runner' do
           config.build_settings['DEFINES_MODULE'] = 'YES'
         end
         
-        # Aggressive fix for webview_flutter_wkwebview 'Flutter/Flutter.h' file not found error
+        # Fix for webview_flutter_wkwebview 'Flutter/Flutter.h' file not found error
         if target.name.include?('webview_flutter') || target.name.include?('FWF')
           # Add Flutter framework search paths
           config.build_settings['FRAMEWORK_SEARCH_PATHS'] ||= ['$(inherited)']
@@ -72,7 +71,6 @@ target 'Runner' do
           config.build_settings['FRAMEWORK_SEARCH_PATHS'] << "${PODS_CONFIGURATION_BUILD_DIR}/Flutter"
           config.build_settings['FRAMEWORK_SEARCH_PATHS'] << "${PODS_ROOT}/../../Flutter"
           config.build_settings['FRAMEWORK_SEARCH_PATHS'] << "${PODS_ROOT}/../../../Flutter"
-          config.build_settings['FRAMEWORK_SEARCH_PATHS'] << "${FLUTTER_ROOT}/bin/cache/artifacts/engine/ios/Flutter.xcframework/ios-arm64_armv7/Flutter.framework"
           config.build_settings['FRAMEWORK_SEARCH_PATHS'] << "${FLUTTER_ROOT}/bin/cache/artifacts/engine/ios"
           
           # Add header search paths

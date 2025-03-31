@@ -28,7 +28,7 @@
 			<key>CFBundleURLSchemes</key>
 			<array>
 				<string>pinewraps</string>
-				<string>com.googleusercontent.apps.YOUR_CLIENT_ID</string>
+				<string>com.googleusercontent.apps.1234567890-abcdefghijklmnopqrstuvwxyz</string>
 			</array>
 			<key>CFBundleURLName</key>
 			<string>com.pinewraps.app</string>
@@ -39,7 +39,7 @@
 		<string>Default</string>
 	</array>
 	<key>GIDClientID</key>
-	<string>YOUR_GOOGLE_CLIENT_ID</string>
+	<string>1234567890-abcdefghijklmnopqrstuvwxyz.apps.googleusercontent.com</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>UIBackgroundModes</key>

@@ -130,33 +130,33 @@ workflows:
           echo "Setting up Flutter project"
           cd "$FCI_BUILD_DIR"
           
-          # Explicitly set development team in project settings
-          echo "Setting development team in project settings"
-          DEVELOPMENT_TEAM=$(security find-certificate -c "Apple Development" | grep "alis" | head -1 | awk -F'"' '{print $4}' | cut -d'(' -f2 | cut -d')' -f1)
-          if [ -n "${DEVELOPMENT_TEAM}" ]; then
-            echo "Found development team: ${DEVELOPMENT_TEAM}"
-            /usr/libexec/PlistBuddy -c "Set :DEVELOPMENT_TEAM ${DEVELOPMENT_TEAM}" ios/Flutter/Generated.xcconfig || true
-            /usr/libexec/PlistBuddy -c "Set :DEVELOPMENT_TEAM ${DEVELOPMENT_TEAM}" ios/Runner.xcodeproj/project.pbxproj || true
-          else
-            echo "Warning: Could not find development team"
-          fi
+          # Get Flutter dependencies
+          echo "Getting Flutter dependencies"
+          flutter pub get
           
-          # Build the app with Flutter first
-          echo "Building iOS app with Flutter"
-          flutter build ios --release --no-codesign
+          # Prepare iOS build environment
+          echo "Preparing iOS build environment"
+          cd ios
+          pod install
+          cd ..
           
           # Create a directory for the archive
           mkdir -p "$FCI_BUILD_DIR/build/ios/archive"
           
-          # Archive the app using xcodebuild
-          echo "Archiving iOS app"
+          # Build and archive directly with xcodebuild
+          echo "Building and archiving iOS app with xcodebuild"
           cd "$FCI_BUILD_DIR"
-          xcodebuild -workspace ios/Runner.xcworkspace \
+          
+          # Use xcodebuild to build and archive in one step
+          xcodebuild clean archive \
+            -workspace ios/Runner.xcworkspace \
             -scheme Runner \
             -configuration Release \
             -sdk iphoneos \
             -archivePath "$FCI_BUILD_DIR/build/ios/archive/Runner.xcarchive" \
-            archive
+            DEVELOPMENT_TEAM="4J9WXB52YV" \
+            PROVISIONING_PROFILE_SPECIFIER="Pinewraps App" \
+            CODE_SIGN_IDENTITY="iPhone Distribution"
           
           # Check if archive was created
           if [ -d "$FCI_BUILD_DIR/build/ios/archive/Runner.xcarchive" ]; then
@@ -184,7 +184,8 @@ workflows:
             xcodebuild -exportArchive \
               -archivePath "$FCI_BUILD_DIR/build/ios/archive/Runner.xcarchive" \
               -exportOptionsPlist "$FCI_BUILD_DIR/ios/exportOptions.plist" \
-              -exportPath "$FCI_BUILD_DIR/build/ios/ipa"
+              -exportPath "$FCI_BUILD_DIR/build/ios/ipa" \
+              -allowProvisioningUpdates
             
             # Verify IPA was created
             if [ -d "$FCI_BUILD_DIR/build/ios/ipa" ]; then
@@ -406,33 +407,33 @@ workflows:
           echo "Setting up Flutter project"
           cd "$FCI_BUILD_DIR"
           
-          # Explicitly set development team in project settings
-          echo "Setting development team in project settings"
-          DEVELOPMENT_TEAM=$(security find-certificate -c "Apple Development" | grep "alis" | head -1 | awk -F'"' '{print $4}' | cut -d'(' -f2 | cut -d')' -f1)
-          if [ -n "${DEVELOPMENT_TEAM}" ]; then
-            echo "Found development team: ${DEVELOPMENT_TEAM}"
-            /usr/libexec/PlistBuddy -c "Set :DEVELOPMENT_TEAM ${DEVELOPMENT_TEAM}" ios/Flutter/Generated.xcconfig || true
-            /usr/libexec/PlistBuddy -c "Set :DEVELOPMENT_TEAM ${DEVELOPMENT_TEAM}" ios/Runner.xcodeproj/project.pbxproj || true
-          else
-            echo "Warning: Could not find development team"
-          fi
+          # Get Flutter dependencies
+          echo "Getting Flutter dependencies"
+          flutter pub get
           
-          # Build the app with Flutter first
-          echo "Building iOS app with Flutter"
-          flutter build ios --release --no-codesign
+          # Prepare iOS build environment
+          echo "Preparing iOS build environment"
+          cd ios
+          pod install
+          cd ..
           
           # Create a directory for the archive
           mkdir -p "$FCI_BUILD_DIR/build/ios/archive"
           
-          # Archive the app using xcodebuild
-          echo "Archiving iOS app"
+          # Build and archive directly with xcodebuild
+          echo "Building and archiving iOS app with xcodebuild"
           cd "$FCI_BUILD_DIR"
-          xcodebuild -workspace ios/Runner.xcworkspace \
+          
+          # Use xcodebuild to build and archive in one step
+          xcodebuild clean archive \
+            -workspace ios/Runner.xcworkspace \
             -scheme Runner \
             -configuration Release \
             -sdk iphoneos \
             -archivePath "$FCI_BUILD_DIR/build/ios/archive/Runner.xcarchive" \
-            archive
+            DEVELOPMENT_TEAM="4J9WXB52YV" \
+            PROVISIONING_PROFILE_SPECIFIER="Pinewraps App" \
+            CODE_SIGN_IDENTITY="iPhone Distribution"
           
           # Check if archive was created
           if [ -d "$FCI_BUILD_DIR/build/ios/archive/Runner.xcarchive" ]; then
@@ -460,7 +461,8 @@ workflows:
             xcodebuild -exportArchive \
               -archivePath "$FCI_BUILD_DIR/build/ios/archive/Runner.xcarchive" \
               -exportOptionsPlist "$FCI_BUILD_DIR/ios/exportOptions.plist" \
-              -exportPath "$FCI_BUILD_DIR/build/ios/ipa"
+              -exportPath "$FCI_BUILD_DIR/build/ios/ipa" \
+              -allowProvisioningUpdates
             
             # Verify IPA was created
             if [ -d "$FCI_BUILD_DIR/build/ios/ipa" ]; then
