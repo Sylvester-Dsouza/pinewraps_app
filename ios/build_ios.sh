@@ -150,6 +150,14 @@ pod install --repo-update
 echo "Swift version:"
 xcrun swift --version
 
+# Ensure Firebase frameworks are properly linked
+echo "Checking Firebase frameworks..."
+if [ -d "Pods/FirebaseCore" ]; then
+  echo "FirebaseCore found in Pods"
+else
+  echo "WARNING: FirebaseCore not found in Pods"
+fi
+
 # Return to project root
 cd ..
 
@@ -172,6 +180,7 @@ xcodebuild clean archive \
   OTHER_CFLAGS="-DSQLITE_ENABLE_COLUMN_METADATA" \
   GCC_PREPROCESSOR_DEFINITIONS="SQLITE_ENABLE_COLUMN_METADATA=1 \$(inherited)" \
   SWIFT_VERSION=5.0 \
+  SWIFT_OBJC_BRIDGING_HEADER="Runner/Runner-Bridging-Header.h" \
   -allowProvisioningUpdates
 
 # Check if archive was created

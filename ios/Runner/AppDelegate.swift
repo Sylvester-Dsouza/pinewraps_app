@@ -1,10 +1,12 @@
 import Flutter
 import UIKit
 import Firebase
+import FirebaseCore
 import FirebaseMessaging
+import UserNotifications
 
-@main
-@objc class AppDelegate: FlutterAppDelegate, MessagingDelegate, UNUserNotificationCenterDelegate {
+@UIApplicationMain
+class AppDelegate: FlutterAppDelegate, MessagingDelegate, UNUserNotificationCenterDelegate {
   override func application(
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
@@ -49,7 +51,7 @@ import FirebaseMessaging
                               withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
     // Fix the UNNotificationPresentationOptions syntax
     if #available(iOS 14.0, *) {
-      completionHandler([.alert, .sound, .badge, .list, .banner])
+      completionHandler([.alert, .sound, .badge])
     } else {
       completionHandler([.alert, .sound, .badge])
     }
