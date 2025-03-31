@@ -54,128 +54,86 @@ workflows:
           echo "Setting up Flutter project"
           cd "$FCI_BUILD_DIR"
           
-          # Get actual Flutter root path
-          FLUTTER_ROOT_PATH=$(which flutter | xargs dirname | xargs dirname)
-          echo "Flutter root path: $FLUTTER_ROOT_PATH"
-          
-          # Define function for privacy bundle removal
-          find_and_remove_privacy_bundles() {
-            echo "Searching for privacy bundles in $1"
-            find "$1" -name "*_privacy.bundle" -type d -print -exec rm -rf {} \; 2>/dev/null || true
-            find "$1" -name "*-privacy.bundle" -type d -print -exec rm -rf {} \; 2>/dev/null || true
-            find "$1" -name "*Privacy.bundle" -type d -print -exec rm -rf {} \; 2>/dev/null || true
-          }
-          
-          # Clean and get dependencies with proper error handling
-          flutter clean || {
-            echo "Flutter clean failed, continuing anyway"
-          }
-          
-          flutter pub get || {
-            echo "Flutter pub get failed"
-            # Try again with network reset
-            flutter pub cache repair
-            flutter pub get || {
-              echo "Flutter pub get failed after cache repair"
-              exit 1
-            }
-          }
+          # Clean and get dependencies
+          flutter clean
+          flutter pub get
           
           # Create Generated.xcconfig if it doesn't exist
           mkdir -p ios/Flutter
           if [ ! -f ios/Flutter/Generated.xcconfig ]; then
             echo "Creating Generated.xcconfig..."
-            ABSOLUTE_APP_PATH="$(cd "$FCI_BUILD_DIR" && pwd)"
             cat > ios/Flutter/Generated.xcconfig << EOF
-FLUTTER_ROOT=$FLUTTER_ROOT_PATH
-FLUTTER_APPLICATION_PATH="$ABSOLUTE_APP_PATH"
-COCOAPODS_PARALLEL_CODE_SIGN=true
-FLUTTER_TARGET=lib/main.dart
-FLUTTER_BUILD_DIR=build
-FLUTTER_BUILD_NAME=1.0.0
-FLUTTER_BUILD_NUMBER=1
-EXCLUDED_ARCHS[sdk=iphonesimulator*]=i386 arm64
-DART_OBFUSCATION=false
-TRACK_WIDGET_CREATION=true
-TREE_SHAKE_ICONS=false
-PACKAGE_CONFIG="$ABSOLUTE_APP_PATH/.dart_tool/package_config.json"
-EOF
+          FLUTTER_ROOT=$(which flutter | xargs dirname | xargs dirname)
+          FLUTTER_APPLICATION_PATH="$(cd "$FCI_BUILD_DIR" && pwd)"
+          COCOAPODS_PARALLEL_CODE_SIGN=true
+          FLUTTER_TARGET=lib/main.dart
+          FLUTTER_BUILD_DIR=build
+          FLUTTER_BUILD_NAME=1.0.0
+          FLUTTER_BUILD_NUMBER=1
+          EXCLUDED_ARCHS[sdk=iphonesimulator*]=i386 arm64
+          DART_OBFUSCATION=false
+          TRACK_WIDGET_CREATION=true
+          TREE_SHAKE_ICONS=false
+          PACKAGE_CONFIG="$(cd "$FCI_BUILD_DIR" && pwd)/.dart_tool/package_config.json"
+          EOF
           fi
           
           # Handle privacy bundles before pod install
           echo "Removing any existing privacy bundles..."
-          find_and_remove_privacy_bundles "$FCI_BUILD_DIR"
-          find_and_remove_privacy_bundles "$FCI_BUILD_DIR/ios"
-          
-          # Validate Xcode project
-          cd ios
-          echo "Validating Xcode project..."
-          xcodebuild -list -project Runner.xcodeproj || {
-            echo "Xcode project validation failed"
-            # Try to fix common issues
-            cd ..
-            flutter clean
-            rm -rf ios/Pods ios/Podfile.lock ios/.symlinks
-            flutter pub get
-            cd ios
-          }
-          
-          # Verify code signing setup
-          echo "Verifying code signing setup..."
-          security find-identity -v -p codesigning || {
-            echo "Code signing certificates not found"
-            keychain add-certificates
-          }
-          
-          # Ensure team ID is set in exportOptions.plist
-          echo "Setting team ID in exportOptions.plist..."
-          sed -i '' "s/\$(DEVELOPMENT_TEAM)/${XCODE_DEVELOPMENT_TEAM}/g" exportOptions.plist
+          find . -name "*_privacy.bundle" -type d -exec rm -rf {} \; 2>/dev/null || true
+          find . -name "*-privacy.bundle" -type d -exec rm -rf {} \; 2>/dev/null || true
+          find . -name "*Privacy.bundle" -type d -exec rm -rf {} \; 2>/dev/null || true
           
           # Clean pods
           echo "Cleaning Pods"
+          cd ios
           rm -rf Pods
           rm -rf Podfile.lock
+          rm -rf .symlinks
+          rm -rf Flutter/Flutter.framework
+          rm -rf Flutter/Flutter.podspec
+          rm -rf Flutter/App.framework
           
           # Install pods
           echo "Installing Pods"
           pod repo update
-          pod install || {
-            echo "First pod install attempt failed, trying with --repo-update"
-            pod install --repo-update || {
-              echo "Second pod install attempt failed, trying with --verbose"
-              pod install --verbose --repo-update || {
-                echo "Third pod install attempt failed, trying with basic configuration"
-                # Create a simplified temporary Podfile
-                cp Podfile Podfile.backup
-                cat > Podfile << EOF
-platform :ios, '12.0'
-
-# CocoaPods analytics sends network stats synchronously affecting flutter build latency.
-ENV['COCOAPODS_DISABLE_STATS'] = 'true'
-
-project 'Runner', {
-  'Debug' => :debug,
-  'Profile' => :release,
-  'Release' => :release,
-}
-
-require File.expand_path(File.join('packages', 'flutter_tools', 'bin', 'podhelper'), '$FLUTTER_ROOT_PATH')
-
-target 'Runner' do
-  use_frameworks!
-  use_modular_headers!
-  flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
-end
-
-post_install do |installer|
-  installer.pods_project.targets.each do |target|
-    target.build_configurations.each do |config|
-      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '12.0'
-      config.build_settings['ENABLE_USER_SCRIPT_SANDBOXING'] = 'NO'
-    end
-  end
-end
-EOF
+          pod install --repo-update || {
+            echo "First pod install attempt failed, trying with --verbose"
+            pod install --verbose --repo-update || {
+              echo "Second pod install attempt failed, trying with basic configuration"
+              # Create a simplified temporary Podfile
+              cp Podfile Podfile.backup
+              cat > Podfile << EOF
+          platform :ios, '12.0'
+          
+          # CocoaPods analytics sends network stats synchronously affecting flutter build latency.
+          ENV['COCOAPODS_DISABLE_STATS'] = 'true'
+          
+          project 'Runner', {
+            'Debug' => :debug,
+            'Profile' => :release,
+            'Release' => :release,
+          }
+          
+          require File.expand_path(File.join('packages', 'flutter_tools', 'bin', 'podhelper'), '$(which flutter | xargs dirname | xargs dirname)')
+          
+          flutter_ios_podfile_setup
+          
+          target 'Runner' do
+            use_frameworks! :linkage => :static
+            use_modular_headers!
+            flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
+          end
+          
+          post_install do |installer|
+            installer.pods_project.targets.each do |target|
+              target.build_configurations.each do |config|
+                config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '12.0'
+                config.build_settings['ENABLE_USER_SCRIPT_SANDBOXING'] = 'NO'
+              end
+            end
+          end
+          EOF
                 pod install --verbose --repo-update || {
                   echo "All pod install attempts failed"
                   # Restore original Podfile
@@ -190,37 +148,11 @@ EOF
           
           # Remove privacy bundles after pod install
           echo "Removing privacy bundles after pod install..."
-          find_and_remove_privacy_bundles "$(pwd)"
-          find_and_remove_privacy_bundles "$(pwd)/Pods"
+          find . -name "*_privacy.bundle" -type d -exec rm -rf {} \; 2>/dev/null || true
+          find . -name "*-privacy.bundle" -type d -exec rm -rf {} \; 2>/dev/null || true
+          find . -name "*Privacy.bundle" -type d -exec rm -rf {} \; 2>/dev/null || true
           
           cd ..
-          
-          # Patch any problematic plugins
-          echo "Patching plugins..."
-          
-          # Patch webview_flutter_wkwebview if it exists
-          WEBVIEW_PATH=$(find ~/.pub-cache/hosted/pub.dev -name "webview_flutter_wkwebview-*" -type d | head -n 1)
-          if [ -n "$WEBVIEW_PATH" ]; then
-            echo "Found webview_flutter_wkwebview at: $WEBVIEW_PATH"
-            WEBVIEW_IOS_DIR="$WEBVIEW_PATH/ios"
-            if [ -d "$WEBVIEW_IOS_DIR" ]; then
-              echo "Checking webview_flutter_wkwebview iOS directory"
-              find "$WEBVIEW_IOS_DIR" -name "*.swift" -exec chmod 644 {} \;
-              echo "Fixed permissions for webview_flutter_wkwebview Swift files"
-            fi
-          fi
-          
-          # Patch url_launcher_ios if it exists
-          URL_LAUNCHER_PATH=$(find ~/.pub-cache/hosted/pub.dev -name "url_launcher_ios-*" -type d | head -n 1)
-          if [ -n "$URL_LAUNCHER_PATH" ]; then
-            echo "Found url_launcher_ios at: $URL_LAUNCHER_PATH"
-            URL_LAUNCHER_IOS_DIR="$URL_LAUNCHER_PATH/ios"
-            if [ -d "$URL_LAUNCHER_IOS_DIR" ]; then
-              echo "Checking url_launcher_ios iOS directory"
-              find "$URL_LAUNCHER_IOS_DIR" -name "*.swift" -exec chmod 644 {} \;
-              echo "Fixed permissions for url_launcher_ios Swift files"
-            fi
-          fi
       - name: Set up Firebase configuration
         script: |
           echo "Setting up Firebase configuration"
@@ -233,55 +165,41 @@ EOF
           cd "$FCI_BUILD_DIR"
           
           # Ensure we have the latest Flutter setup
-          flutter clean || echo "Flutter clean failed, continuing anyway"
-          flutter pub get || {
-            echo "Flutter pub get failed"
-            flutter pub cache repair
-            flutter pub get || exit 1
-          }
+          flutter clean
+          flutter pub get
           
           # Remove any privacy bundles before building
           echo "Removing privacy bundles before build..."
-          find_and_remove_privacy_bundles() {
-            echo "Searching for privacy bundles in $1"
-            find "$1" -name "*_privacy.bundle" -type d -print -exec rm -rf {} \; 2>/dev/null || true
-            find "$1" -name "*-privacy.bundle" -type d -print -exec rm -rf {} \; 2>/dev/null || true
-            find "$1" -name "*Privacy.bundle" -type d -print -exec rm -rf {} \; 2>/dev/null || true
-          }
+          find . -name "*_privacy.bundle" -type d -exec rm -rf {} \; 2>/dev/null || true
+          find . -name "*-privacy.bundle" -type d -exec rm -rf {} \; 2>/dev/null || true
+          find . -name "*Privacy.bundle" -type d -exec rm -rf {} \; 2>/dev/null || true
           
-          find_and_remove_privacy_bundles "$FCI_BUILD_DIR"
-          find_and_remove_privacy_bundles "$FCI_BUILD_DIR/ios"
-          find_and_remove_privacy_bundles "$FCI_BUILD_DIR/build"
+          # Verify code signing setup
+          cd ios
+          security find-identity -v -p codesigning || {
+            echo "Code signing certificates not found, re-adding..."
+            keychain add-certificates
+          }
+          cd ..
           
           # Build iOS app
-          flutter build ios --release --no-codesign || {
-            echo "Flutter build ios failed"
-            # Try with verbose output
-            flutter build ios --release --no-codesign --verbose || exit 1
-          }
+          flutter build ios --release --no-codesign
           
           # Create IPA
           cd ios
-          
-          # Set consistent archive path
-          ARCHIVE_PATH="$FCI_BUILD_DIR/ios/build/Runner.xcarchive"
           
           # Ensure team ID is set in exportOptions.plist
           sed -i '' "s/\$(DEVELOPMENT_TEAM)/${XCODE_DEVELOPMENT_TEAM}/g" exportOptions.plist
           
           # Try multiple methods to create IPA
           echo "Creating IPA using xcodebuild archive and exportArchive"
+          ARCHIVE_PATH="$FCI_BUILD_DIR/ios/build/Runner.xcarchive"
           xcodebuild -workspace Runner.xcworkspace -scheme Runner -configuration Release clean archive -archivePath "$ARCHIVE_PATH" -allowProvisioningUpdates || {
             echo "Archive failed, trying alternative approach"
             xcodebuild -workspace Runner.xcworkspace -scheme Runner -configuration Release clean archive -archivePath "$ARCHIVE_PATH" -allowProvisioningUpdates CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM="${XCODE_DEVELOPMENT_TEAM}" || {
               echo "Second archive attempt failed, trying with explicit signing"
               xcodebuild -workspace Runner.xcworkspace -scheme Runner -configuration Release clean archive -archivePath "$ARCHIVE_PATH" -allowProvisioningUpdates CODE_SIGN_IDENTITY="Apple Distribution" PROVISIONING_PROFILE_SPECIFIER="match AppStore com.pinewraps.app" || {
                 echo "All archive attempts failed"
-                # Print diagnostic information
-                echo "Listing available provisioning profiles:"
-                security find-identity -v -p codesigning
-                echo "Listing available certificates:"
-                security find-certificate -a -c "Apple Distribution" | grep "alis"
                 exit 1
               }
             }
@@ -290,104 +208,55 @@ EOF
           # Export IPA
           echo "Exporting archive to IPA"
           if [ -d "$ARCHIVE_PATH" ]; then
-            # Create export directory
-            mkdir -p "$FCI_BUILD_DIR/ios/build/ios/ipa"
-            
-            xcodebuild -exportArchive -archivePath "$ARCHIVE_PATH" -exportPath "$FCI_BUILD_DIR/ios/build/ios/ipa" -exportOptionsPlist exportOptions.plist || {
+            xcodebuild -exportArchive -archivePath "$ARCHIVE_PATH" -exportPath build/ios/ipa -exportOptionsPlist exportOptions.plist || {
               echo "Export failed, trying alternative approach"
               # Try with manual signing
-              xcodebuild -exportArchive -archivePath "$ARCHIVE_PATH" -exportPath "$FCI_BUILD_DIR/ios/build/ios/ipa" -exportOptionsPlist exportOptions.plist -allowProvisioningUpdates || {
+              xcodebuild -exportArchive -archivePath "$ARCHIVE_PATH" -exportPath build/ios/ipa -exportOptionsPlist exportOptions.plist -allowProvisioningUpdates || {
                 echo "Second export attempt failed, trying with explicit team ID"
                 # Create a temporary exportOptions.plist with explicit team ID
                 cp exportOptions.plist exportOptions.temp.plist
                 sed -i '' "s/\$(DEVELOPMENT_TEAM)/${XCODE_DEVELOPMENT_TEAM}/g" exportOptions.temp.plist
-                xcodebuild -exportArchive -archivePath "$ARCHIVE_PATH" -exportPath "$FCI_BUILD_DIR/ios/build/ios/ipa" -exportOptionsPlist exportOptions.temp.plist -allowProvisioningUpdates || {
+                xcodebuild -exportArchive -archivePath "$ARCHIVE_PATH" -exportPath build/ios/ipa -exportOptionsPlist exportOptions.temp.plist -allowProvisioningUpdates || {
                   echo "All export attempts failed"
-                  # Print diagnostic information
-                  echo "Contents of exportOptions.plist:"
-                  cat exportOptions.plist
-                  echo "Contents of exportOptions.temp.plist:"
-                  cat exportOptions.temp.plist
                   exit 1
                 }
                 rm exportOptions.temp.plist
               }
             }
           else
-            echo "Archive not found at path $ARCHIVE_PATH"
-            echo "Listing contents of build directory:"
-            find "$FCI_BUILD_DIR/ios/build" -type d | sort
+            echo "Archive not found, skipping export"
             exit 1
           fi
       - name: Create IPA
         script: |
           cd "$FCI_BUILD_DIR"
           
-          # Define function for privacy bundle removal
-          find_and_remove_privacy_bundles() {
-            echo "Searching for privacy bundles in $1"
-            find "$1" -name "*_privacy.bundle" -type d -print -exec rm -rf {} \; 2>/dev/null || true
-            find "$1" -name "*-privacy.bundle" -type d -print -exec rm -rf {} \; 2>/dev/null || true
-            find "$1" -name "*Privacy.bundle" -type d -print -exec rm -rf {} \; 2>/dev/null || true
-          }
-          
-          # Set consistent archive path
-          ARCHIVE_PATH="$FCI_BUILD_DIR/ios/build/Runner.xcarchive"
-          ARCHIVE_PATH_ALT="$FCI_BUILD_DIR/build/ios/archive/Runner.xcarchive"
-          IPA_OUTPUT_PATH="$FCI_BUILD_DIR/build/ios/ipa"
-          
-          # Check if the archive exists at the primary location
-          if [ -d "$ARCHIVE_PATH" ]; then
-            echo "Archive exists at $ARCHIVE_PATH, proceeding with export"
-            ACTUAL_ARCHIVE_PATH="$ARCHIVE_PATH"
-          # Check if the archive exists at the alternative location
-          elif [ -d "$ARCHIVE_PATH_ALT" ]; then
-            echo "Archive exists at $ARCHIVE_PATH_ALT, proceeding with export"
-            ACTUAL_ARCHIVE_PATH="$ARCHIVE_PATH_ALT"
-          else
-            echo "Archive not found at either path. Attempting to create one."
-            cd ios
+          # Check if the archive exists
+          if [ -d "$FCI_BUILD_DIR/build/ios/archive/Runner.xcarchive" ]; then
+            echo "Archive exists, proceeding with export"
             
-            # Ensure team ID is set in exportOptions.plist
-            sed -i '' "s/\$(DEVELOPMENT_TEAM)/${XCODE_DEVELOPMENT_TEAM}/g" exportOptions.plist
+            # Create the export directory
+            mkdir -p "$FCI_BUILD_DIR/build/ios/ipa"
             
-            # Remove any privacy bundles
-            find_and_remove_privacy_bundles "$(pwd)"
-            find_and_remove_privacy_bundles "$(pwd)/Pods"
+            # Export the IPA
+            xcodebuild -exportArchive \
+              -archivePath "$FCI_BUILD_DIR/build/ios/archive/Runner.xcarchive" \
+              -exportOptionsPlist "$FCI_BUILD_DIR/ios/exportOptions.plist" \
+              -exportPath "$FCI_BUILD_DIR/build/ios/ipa" \
+              -allowProvisioningUpdates
             
-            # Create archive
-            xcodebuild -workspace Runner.xcworkspace -scheme Runner -configuration Release clean archive -archivePath "$ARCHIVE_PATH" -allowProvisioningUpdates CODE_SIGN_IDENTITY="Apple Distribution" PROVISIONING_PROFILE_SPECIFIER="match AppStore com.pinewraps.app" || {
-              echo "Failed to create archive"
+            # Verify IPA was created
+            if [ -d "$FCI_BUILD_DIR/build/ios/ipa" ]; then
+              echo "IPA created successfully:"
+              ls -la "$FCI_BUILD_DIR/build/ios/ipa"
+            else
+              echo "Failed to create IPA"
               exit 1
-            }
-            
-            ACTUAL_ARCHIVE_PATH="$ARCHIVE_PATH"
-            cd ..
-          fi
-          
-          # Create the export directory
-          mkdir -p "$IPA_OUTPUT_PATH"
-          
-          # Export the IPA
-          cd ios
-          xcodebuild -exportArchive -archivePath "$ACTUAL_ARCHIVE_PATH" -exportOptionsPlist exportOptions.plist -exportPath "$IPA_OUTPUT_PATH" -allowProvisioningUpdates || {
-            echo "Export failed, trying with explicit team ID"
-            # Create a temporary exportOptions.plist with explicit team ID
-            cp exportOptions.plist exportOptions.temp.plist
-            sed -i '' "s/\$(DEVELOPMENT_TEAM)/${XCODE_DEVELOPMENT_TEAM}/g" exportOptions.temp.plist
-            xcodebuild -exportArchive -archivePath "$ACTUAL_ARCHIVE_PATH" -exportOptionsPlist exportOptions.temp.plist -exportPath "$IPA_OUTPUT_PATH" -allowProvisioningUpdates || {
-              echo "Failed to export IPA"
-              exit 1
-            }
-            rm exportOptions.temp.plist
-          }
-          
-          # Verify IPA was created
-          if [ -d "$IPA_OUTPUT_PATH" ]; then
-            echo "IPA created successfully:"
-            ls -la "$IPA_OUTPUT_PATH"
+            fi
           else
-            echo "Failed to create IPA"
+            echo "Archive not found at path $FCI_BUILD_DIR/build/ios/archive/Runner.xcarchive"
+            echo "Listing contents of build directory:"
+            find "$FCI_BUILD_DIR/build" -type d | sort
             exit 1
           fi
     artifacts:
