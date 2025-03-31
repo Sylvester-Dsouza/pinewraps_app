@@ -194,43 +194,53 @@ done
 
 # Fix webview_flutter_wkwebview_privacy.bundle issue
 echo "Fixing webview_flutter_wkwebview_privacy.bundle issue..."
+
+# Method 1: Remove the bundle completely
 WEBVIEW_PRIVACY_DIR="Pods/webview_flutter_wkwebview/ios/webview_flutter_wkwebview_privacy.bundle"
 if [ -d "$WEBVIEW_PRIVACY_DIR" ]; then
-  echo "Found webview_flutter_wkwebview_privacy.bundle"
-  
-  # Create a simple Info.plist if it doesn't exist
-  if [ ! -f "$WEBVIEW_PRIVACY_DIR/Info.plist" ]; then
-    echo "Creating Info.plist for webview_flutter_wkwebview_privacy.bundle"
-    cat > "$WEBVIEW_PRIVACY_DIR/Info.plist" << 'EOF'
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-	<key>CFBundleDevelopmentRegion</key>
-	<string>en</string>
-	<key>CFBundleIdentifier</key>
-	<string>org.cocoapods.webview-flutter-wkwebview-privacy</string>
-	<key>CFBundleInfoDictionaryVersion</key>
-	<string>6.0</string>
-	<key>CFBundleName</key>
-	<string>webview_flutter_wkwebview_privacy</string>
-	<key>CFBundlePackageType</key>
-	<string>BNDL</string>
-	<key>CFBundleShortVersionString</key>
-	<string>1.0.0</string>
-	<key>CFBundleSignature</key>
-	<string>????</string>
-	<key>CFBundleVersion</key>
-	<string>1</string>
-	<key>NSPrincipalClass</key>
-	<string></string>
-</dict>
-</plist>
-EOF
-  fi
-else
-  echo "webview_flutter_wkwebview_privacy.bundle not found"
+  echo "Found webview_flutter_wkwebview_privacy.bundle - removing it"
+  rm -rf "$WEBVIEW_PRIVACY_DIR"
 fi
+
+# Method 2: Modify the webview_flutter_wkwebview.podspec to exclude the resource bundle
+WEBVIEW_PODSPEC=$(find Pods -name "webview_flutter_wkwebview.podspec" -type f | head -n 1)
+if [ -n "$WEBVIEW_PODSPEC" ]; then
+  echo "Found webview_flutter_wkwebview.podspec at: $WEBVIEW_PODSPEC"
+  # Backup the original file
+  cp "$WEBVIEW_PODSPEC" "${WEBVIEW_PODSPEC}.bak"
+  # Remove the resource_bundles section
+  sed -i.bak 's/s.resource_bundles.*=.*{.*}//g' "$WEBVIEW_PODSPEC"
+  echo "Modified webview_flutter_wkwebview.podspec to remove resource bundles"
+fi
+
+# Method 3: Modify the Pods project directly
+echo "Modifying Pods.xcodeproj to exclude webview_flutter_wkwebview_privacy.bundle"
+ruby -e '
+require "xcodeproj"
+project_path = "Pods/Pods.xcodeproj"
+project = Xcodeproj::Project.open(project_path)
+target = project.targets.find { |t| t.name == "webview_flutter_wkwebview-webview_flutter_wkwebview_privacy" }
+if target
+  puts "Found webview_flutter_wkwebview-webview_flutter_wkwebview_privacy target"
+  target.build_configurations.each do |config|
+    config.build_settings["EXCLUDED_SOURCE_FILE_NAMES"] = "*"
+    config.build_settings["SKIP_INSTALL"] = "YES"
+    config.build_settings["CODE_SIGNING_ALLOWED"] = "NO"
+  end
+  project.save
+  puts "Modified target configuration"
+else
+  puts "Target not found"
+end
+' || echo "Failed to modify Pods.xcodeproj"
+
+# Method 4: Remove the target from the Pods project build phases
+echo "Removing webview_flutter_wkwebview_privacy.bundle from build phases"
+find Pods -name "*.xcconfig" -type f -exec sed -i.bak 's/webview_flutter_wkwebview_privacy.bundle//g' {} \;
+
+# Reinstall pods after modifications
+echo "Reinstalling pods after modifications"
+pod install
 
 # Return to project root
 cd ..
