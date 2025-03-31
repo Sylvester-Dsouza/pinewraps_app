@@ -69,30 +69,25 @@
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	
-	<!-- Privacy descriptions -->
-	<!-- For webview_flutter_wkwebview -->
+	<!-- Camera Usage -->
 	<key>NSCameraUsageDescription</key>
 	<string>This app needs camera access to scan QR codes and take photos for uploads</string>
+	
+	<!-- Photo Library Usage -->
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>This app needs access to photo library for uploading images</string>
+	
+	<!-- Location Usage -->
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>This app needs access to location when open to provide location-based notifications</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>This app needs access to location to provide location-based notifications</string>
+	
+	<!-- Microphone Usage -->
 	<key>NSMicrophoneUsageDescription</key>
 	<string>This app needs microphone access for voice input in web content</string>
 	
-	<!-- For url_launcher -->
-	<key>LSApplicationQueriesSchemes</key>
-	<array>
-		<string>https</string>
-		<string>http</string>
-		<string>tel</string>
-		<string>mailto</string>
-		<string>whatsapp</string>
-	</array>
-	
-	<!-- For path_provider and shared_preferences -->
-	<key>NSDocumentsDirectoryUsageDescription</key>
-	<string>This app needs access to documents to save your preferences and cached data</string>
-	<key>NSDownloadsDirectoryUsageDescription</key>
-	<string>This app needs access to downloads to save files you choose to download</string>
-	
-	<!-- For network requests -->
+	<!-- Network Access -->
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsArbitraryLoads</key>
@@ -101,16 +96,18 @@
 		<true/>
 	</dict>
 	
-	<!-- For photo library access -->
-	<key>NSPhotoLibraryUsageDescription</key>
-	<string>This app needs access to photo library for uploading images</string>
-	<key>NSPhotoLibraryAddUsageDescription</key>
-	<string>This app needs access to photo library to save images</string>
+	<!-- Document Access -->
+	<key>UISupportsDocumentBrowser</key>
+	<true/>
+	<key>LSSupportsOpeningDocumentsInPlace</key>
+	<true/>
+	<key>NSDocumentsFolderUsageDescription</key>
+	<string>This app needs access to documents for file operations</string>
 	
-	<!-- For Firebase Messaging -->
-	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>This app needs access to location when open to provide location-based notifications</string>
-	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-	<string>This app needs access to location when in the background for location-based notifications</string>
+	<!-- App Settings -->
+	<key>UIViewControllerBasedStatusBarAppearance</key>
+	<false/>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 </dict>
 </plist>

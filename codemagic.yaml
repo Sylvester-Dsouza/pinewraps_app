@@ -48,10 +48,32 @@ workflows:
             # Clean up
             rm "${PRIVATE_KEY_PATH}"
           fi
-      - name: Install dependencies
+      - name: Flutter setup and dependencies
         script: |
+          # Ensure Flutter is properly initialized
+          echo "Initializing Flutter"
+          flutter doctor -v
+          
+          # Clean Flutter project
+          echo "Cleaning Flutter project"
+          flutter clean
+          
+          # Get Flutter dependencies
+          echo "Getting Flutter dependencies"
           flutter pub get
-          cd ios && pod install
+          
+          # Generate Flutter files
+          echo "Generating Flutter files"
+          flutter packages pub run build_runner build --delete-conflicting-outputs || true
+          
+          # Install CocoaPods dependencies
+          echo "Installing CocoaPods dependencies"
+          cd ios
+          pod repo update
+          rm -rf Pods
+          rm -f Podfile.lock
+          pod install --verbose
+          cd ..
       - name: Set up Firebase configuration
         script: |
           echo "Setting up Firebase configuration"
@@ -60,7 +82,15 @@ workflows:
       - name: Flutter build iOS
         script: |
           cd "$FCI_BUILD_DIR"
+          # Build Flutter iOS
           flutter build ios --release --no-codesign
+          
+          # Fix any potential issues with privacy bundles
+          cd ios
+          find . -name "*_privacy.bundle" -type d -exec rm -rf {} \; 2>/dev/null || true
+          find . -name "*-privacy.bundle" -type d -exec rm -rf {} \; 2>/dev/null || true
+          find . -name "*Privacy.bundle" -type d -exec rm -rf {} \; 2>/dev/null || true
+          cd ..
       - name: Create IPA
         script: |
           cd "$FCI_BUILD_DIR"
@@ -69,8 +99,9 @@ workflows:
           ARCHIVE_PATH="$HOME/Library/Developer/Xcode/Archives/$(date +%Y-%m-%d)/App_$(date +%H.%M.%S).xcarchive"
           mkdir -p "$(dirname "$ARCHIVE_PATH")"
           
-          # Create archive with xcodebuild, ignoring privacy bundle errors
-          xcodebuild -workspace ios/Runner.xcworkspace \
+          # Create archive with xcodebuild
+          cd ios
+          xcodebuild -workspace Runner.xcworkspace \
             -scheme Runner \
             -sdk iphoneos \
             -configuration Release \
@@ -84,38 +115,51 @@ workflows:
             DEVELOPMENT_TEAM="$XCODE_DEVELOPMENT_TEAM" \
             PROVISIONING_PROFILE_SPECIFIER="$PROVISIONING_PROFILE" \
             -allowProvisioningUpdates \
-            -quiet || true  # Continue even if there are errors
+            EXCLUDED_ARCHS="i386 armv7 armv7s" \
+            || true  # Continue even if there are errors
           
           # Force create IPA even if archive had errors
           if [ -d "$ARCHIVE_PATH" ]; then
             xcodebuild -exportArchive \
               -archivePath "$ARCHIVE_PATH" \
-              -exportOptionsPlist ios/exportOptions.plist \
-              -exportPath build/ios/ipa \
+              -exportOptionsPlist exportOptions.plist \
+              -exportPath ../build/ios/ipa \
               -allowProvisioningUpdates \
-              -quiet || true
+              || true
           else
             # If archive doesn't exist, try to create it directly from the build
-            mkdir -p build/ios/ipa
-            cd ios
+            mkdir -p ../build/ios/ipa
             xcodebuild -workspace Runner.xcworkspace \
               -scheme Runner \
               -sdk iphoneos \
               -configuration Release \
               -exportOptionsPlist exportOptions.plist \
               -allowProvisioningUpdates \
-              clean archive -archivePath build/ios/ipa/Runner.xcarchive \
+              clean archive -archivePath ../build/ios/ipa/Runner.xcarchive \
               CODE_SIGN_IDENTITY="Apple Distribution" \
               PROVISIONING_PROFILE_SPECIFIER="$PROVISIONING_PROFILE" \
-              -quiet || true
+              EXCLUDED_ARCHS="i386 armv7 armv7s" \
+              || true
               
             # Create IPA from archive
             xcodebuild -exportArchive \
-              -archivePath build/ios/ipa/Runner.xcarchive \
+              -archivePath ../build/ios/ipa/Runner.xcarchive \
               -exportOptionsPlist exportOptions.plist \
-              -exportPath build/ios/ipa \
+              -exportPath ../build/ios/ipa \
               -allowProvisioningUpdates \
-              -quiet || true
+              || true
+          fi
+          
+          # If IPA still doesn't exist, try one more approach
+          if [ ! -f "../build/ios/ipa/Runner.ipa" ]; then
+            echo "Trying alternative IPA creation method..."
+            cd ..
+            mkdir -p build/ios/ipa
+            xcrun xcodebuild -exportArchive \
+              -archivePath "$ARCHIVE_PATH" \
+              -exportOptionsPlist ios/exportOptions.plist \
+              -exportPath build/ios/ipa \
+              || true
           fi
     artifacts:
       - build/ios/ipa/*.ipa

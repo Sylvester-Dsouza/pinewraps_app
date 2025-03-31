@@ -21,10 +21,15 @@
 	<true/>
 	<key>thinning</key>
 	<string>&lt;none&gt;</string>
-	<key>manifest</key>
-	<dict>
-		<key>appURL</key>
-		<string>https://pinewraps.com</string>
-	</dict>
+	<key>uploadBitcode</key>
+	<false/>
+	<key>uploadSymbols</key>
+	<true/>
+	<key>destination</key>
+	<string>export</string>
+	<key>iCloudContainerEnvironment</key>
+	<string>Production</string>
+	<key>generateAppStoreInformation</key>
+	<false/>
 </dict>
 </plist>

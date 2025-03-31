@@ -469,7 +469,6 @@
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
-				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GCC_C_LANGUAGE_STANDARD = gnu99;
 				GCC_DYNAMIC_NO_PIC = NO;
 				GCC_NO_COMMON_BLOCKS = YES;
@@ -494,6 +493,7 @@
 					"*-privacy.bundle",
 					"*Privacy.bundle",
 				);
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 			};
 			name = Debug;
 		};
@@ -604,6 +604,12 @@
 					"PERMISSION_LOCATION=1",
 					"PERMISSION_MICROPHONE=1",
 				);
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				EXCLUDED_ARCHS = "i386 armv7 armv7s";
+				DEAD_CODE_STRIPPING = YES;
+				COPY_PHASE_STRIP = YES;
+				STRIP_INSTALLED_PRODUCT = YES;
+				STRIP_STYLE = "non-global";
 			};
 			name = Debug;
 		};
@@ -654,6 +660,12 @@
 					"PERMISSION_LOCATION=1",
 					"PERMISSION_MICROPHONE=1",
 				);
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				EXCLUDED_ARCHS = "i386 armv7 armv7s";
+				DEAD_CODE_STRIPPING = YES;
+				COPY_PHASE_STRIP = YES;
+				STRIP_INSTALLED_PRODUCT = YES;
+				STRIP_STYLE = "non-global";
 			};
 			name = Release;
 		};
