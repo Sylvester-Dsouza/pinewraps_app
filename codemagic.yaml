@@ -21,23 +21,23 @@ workflows:
           # Initialize keychain
           keychain initialize
           
-          # Use App Store Connect API for code signing with CERT_DISTRIBUTION
+          # Use App Store Connect API for code signing
           if [ -n "$APP_STORE_CONNECT_ISSUER_ID" ] && [ -n "$APP_STORE_CONNECT_KEY_IDENTIFIER" ] && [ -n "$APP_STORE_CONNECT_PRIVATE_KEY" ]; then
             echo "Using App Store Connect API for code signing"
             
-            # First, create the app in App Store Connect if it doesn't exist
-            app-store-connect create-app "$IOS_BUNDLE_ID" "Pinewraps" --skip-if-exists || true
+            # Register the bundle ID if it doesn't exist
+            echo "Registering bundle ID if it doesn't exist..."
+            app-store-connect bundle-ids | grep "$IOS_BUNDLE_ID" || app-store-connect create-bundle-id "$IOS_BUNDLE_ID" "Pinewraps" --platform IOS
             
-            # Use CERT_DISTRIBUTION with fetch-signing-files
-            echo "Fetching or creating signing files with CERT_DISTRIBUTION..."
+            # Fetch or create the signing files
+            echo "Fetching or creating signing files..."
             app-store-connect fetch-signing-files "$IOS_BUNDLE_ID" \
               --type IOS_APP_STORE \
-              --create \
-              --certificate CERT_DISTRIBUTION
+              --create
             
             # Check if the profile was created successfully
             if [ $? -eq 0 ]; then
-              echo "Successfully set up code signing with App Store Connect API and CERT_DISTRIBUTION"
+              echo "Successfully set up code signing with App Store Connect API"
             else
               echo "Failed to fetch or create provisioning profile. Please check your App Store Connect API credentials."
               echo "Make sure your Apple Developer account has the necessary permissions."
@@ -206,23 +206,23 @@ workflows:
           # Initialize keychain
           keychain initialize
           
-          # Use App Store Connect API for code signing with CERT_DISTRIBUTION
+          # Use App Store Connect API for code signing
           if [ -n "$APP_STORE_CONNECT_ISSUER_ID" ] && [ -n "$APP_STORE_CONNECT_KEY_IDENTIFIER" ] && [ -n "$APP_STORE_CONNECT_PRIVATE_KEY" ]; then
             echo "Using App Store Connect API for code signing"
             
-            # First, create the app in App Store Connect if it doesn't exist
-            app-store-connect create-app "$IOS_BUNDLE_ID" "Pinewraps" --skip-if-exists || true
+            # Register the bundle ID if it doesn't exist
+            echo "Registering bundle ID if it doesn't exist..."
+            app-store-connect bundle-ids | grep "$IOS_BUNDLE_ID" || app-store-connect create-bundle-id "$IOS_BUNDLE_ID" "Pinewraps" --platform IOS
             
-            # Use CERT_DISTRIBUTION with fetch-signing-files
-            echo "Fetching or creating signing files with CERT_DISTRIBUTION..."
+            # Fetch or create the signing files
+            echo "Fetching or creating signing files..."
             app-store-connect fetch-signing-files "$IOS_BUNDLE_ID" \
               --type IOS_APP_STORE \
-              --create \
-              --certificate CERT_DISTRIBUTION
+              --create
             
             # Check if the profile was created successfully
             if [ $? -eq 0 ]; then
-              echo "Successfully set up code signing with App Store Connect API and CERT_DISTRIBUTION"
+              echo "Successfully set up code signing with App Store Connect API"
             else
               echo "Failed to fetch or create provisioning profile. Please check your App Store Connect API credentials."
               echo "Make sure your Apple Developer account has the necessary permissions."
