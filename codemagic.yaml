@@ -11,9 +11,6 @@ workflows:
         bundle_identifier: com.pinewraps.app
       vars:
         IOS_BUNDLE_ID: "com.pinewraps.app"
-        APP_STORE_CONNECT_ISSUER_ID: ${APP_STORE_CONNECT_ISSUER_ID}
-        APP_STORE_CONNECT_KEY_IDENTIFIER: ${APP_STORE_CONNECT_KEY_IDENTIFIER}
-        APP_STORE_CONNECT_PRIVATE_KEY: ${APP_STORE_CONNECT_PRIVATE_KEY}
     scripts:
       - name: Set up code signing
         script: |
@@ -22,91 +19,18 @@ workflows:
           keychain initialize
           
           # Use App Store Connect API for code signing
-          if [ -n "${APP_STORE_CONNECT_ISSUER_ID}" ] && [ -n "${APP_STORE_CONNECT_KEY_IDENTIFIER}" ] && [ -n "${APP_STORE_CONNECT_PRIVATE_KEY}" ]; then
-            echo "Using App Store Connect API for code signing"
-            
-            # Create a temporary file for the private key
-            PRIVATE_KEY_PATH=$(mktemp)
-            echo "${APP_STORE_CONNECT_PRIVATE_KEY}" > "${PRIVATE_KEY_PATH}"
-            
-            # Check if bundle ID exists
-            echo "Checking if bundle ID exists..."
-            app-store-connect bundle-ids --issuer-id "${APP_STORE_CONNECT_ISSUER_ID}" --key-id "${APP_STORE_CONNECT_KEY_IDENTIFIER}" --private-key "${PRIVATE_KEY_PATH}" | grep -q "${IOS_BUNDLE_ID}"
-            
-            # If bundle ID doesn't exist, create it
-            if [ $? -ne 0 ]; then
-              echo "Creating bundle ID..."
-              app-store-connect create-bundle-id --issuer-id "${APP_STORE_CONNECT_ISSUER_ID}" --key-id "${APP_STORE_CONNECT_KEY_IDENTIFIER}" --private-key "${PRIVATE_KEY_PATH}" --name "Pinewraps" --platform IOS "${IOS_BUNDLE_ID}"
-            else
-              echo "Bundle ID already exists"
-            fi
-            
-            # Fetch signing files
-            app-store-connect fetch-signing-files "${IOS_BUNDLE_ID}" --type IOS_APP_STORE --create --issuer-id "${APP_STORE_CONNECT_ISSUER_ID}" --key-id "${APP_STORE_CONNECT_KEY_IDENTIFIER}" --private-key "${PRIVATE_KEY_PATH}"
-            keychain add-certificates
-            
-            # Clean up
-            rm "${PRIVATE_KEY_PATH}"
-          fi
-      - name: Flutter Setup & Dependencies
+          app-store-connect fetch-signing-files "$IOS_BUNDLE_ID" \
+            --type IOS_APP_STORE \
+            --create
+          keychain add-certificates
+      
+      - name: Clean build environment
         script: |
-          # Setup Flutter
-          echo "Setting up Flutter project"
+          echo "Cleaning build environment"
           cd "$FCI_BUILD_DIR"
-          
-          # Clean and get dependencies with fallback
           flutter clean
-          flutter pub get || {
-            echo "Flutter pub get failed, trying with --no-pub-get"
-            flutter clean --no-pub-get
-            
-            # Try to fix dependency issues by updating pubspec.lock
-            if [ -f pubspec.lock ]; then
-              echo "Removing pubspec.lock to force dependency resolution"
-              rm pubspec.lock
-            fi
-            
-            # Try again with verbose output
-            flutter pub get -v || {
-              echo "Flutter pub get still failing, trying with downgrade"
-              flutter pub get --no-precompile || {
-                echo "All attempts to get dependencies failed"
-                # Continue anyway as we'll try to fix this in the pod install step
-              }
-            }
-          }
           
-          # Create Generated.xcconfig if it doesn't exist
-          mkdir -p ios/Flutter
-          if [ ! -f ios/Flutter/Generated.xcconfig ]; then
-            echo "Creating Generated.xcconfig..."
-            FLUTTER_ROOT_PATH=$(which flutter | xargs dirname | xargs dirname)
-            echo "Flutter root path: $FLUTTER_ROOT_PATH"
-            
-            cat > ios/Flutter/Generated.xcconfig << EOF
-          FLUTTER_ROOT=$FLUTTER_ROOT_PATH
-          FLUTTER_APPLICATION_PATH="$(cd "$FCI_BUILD_DIR" && pwd)"
-          COCOAPODS_PARALLEL_CODE_SIGN=true
-          FLUTTER_TARGET=lib/main.dart
-          FLUTTER_BUILD_DIR=build
-          FLUTTER_BUILD_NAME=1.0.0
-          FLUTTER_BUILD_NUMBER=1
-          EXCLUDED_ARCHS[sdk=iphonesimulator*]=i386 arm64
-          DART_OBFUSCATION=false
-          TRACK_WIDGET_CREATION=true
-          TREE_SHAKE_ICONS=false
-          PACKAGE_CONFIG="$(cd "$FCI_BUILD_DIR" && pwd)/.dart_tool/package_config.json"
-          EOF
-          fi
-          
-          # Handle privacy bundles before pod install
-          echo "Removing any existing privacy bundles..."
-          find . -name "*_privacy.bundle" -type d -exec rm -rf {} \; 2>/dev/null || true
-          find . -name "*-privacy.bundle" -type d -exec rm -rf {} \; 2>/dev/null || true
-          find . -name "*Privacy.bundle" -type d -exec rm -rf {} \; 2>/dev/null || true
-          
-          # Clean pods
-          echo "Cleaning Pods"
+          # Clean iOS specific artifacts
           cd ios
           rm -rf Pods
           rm -rf Podfile.lock
@@ -114,584 +38,229 @@ workflows:
           rm -rf Flutter/Flutter.framework
           rm -rf Flutter/Flutter.podspec
           rm -rf Flutter/App.framework
+          rm -rf build
           
-          # Install pods
-          echo "Installing Pods"
-          pod repo update
-          pod install --repo-update || {
-            echo "First pod install attempt failed, trying with --verbose"
-            pod install --verbose --repo-update || {
-              echo "Second pod install attempt failed, trying with basic configuration"
-              # Create a simplified temporary Podfile
-              cp Podfile Podfile.backup
-              cat > Podfile << EOF
-          platform :ios, '12.0'
-          
-          # CocoaPods analytics sends network stats synchronously affecting flutter build latency.
-          ENV['COCOAPODS_DISABLE_STATS'] = 'true'
-          
-          project 'Runner', {
-            'Debug' => :debug,
-            'Profile' => :release,
-            'Release' => :release,
-          }
-          
-          require File.expand_path(File.join('packages', 'flutter_tools', 'bin', 'podhelper'), '$(which flutter | xargs dirname | xargs dirname)')
-          
-          flutter_ios_podfile_setup
-          
-          target 'Runner' do
-            use_frameworks! :linkage => :static
-            use_modular_headers!
-            flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
-          end
-          
-          post_install do |installer|
-            installer.pods_project.targets.each do |target|
-              target.build_configurations.each do |config|
-                config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '12.0'
-                config.build_settings['ENABLE_USER_SCRIPT_SANDBOXING'] = 'NO'
-              end
-            end
-          end
-          EOF
-                pod install --verbose --repo-update || {
-                  echo "All pod install attempts failed"
-                  # Restore original Podfile
-                  mv Podfile.backup Podfile
-                  exit 1
-                }
-                # Restore original Podfile
-                mv Podfile.backup Podfile
-              }
-            }
-          }
-          
-          # Remove privacy bundles after pod install
-          echo "Removing privacy bundles after pod install..."
+          # Remove privacy bundles
           find . -name "*_privacy.bundle" -type d -exec rm -rf {} \; 2>/dev/null || true
           find . -name "*-privacy.bundle" -type d -exec rm -rf {} \; 2>/dev/null || true
           find . -name "*Privacy.bundle" -type d -exec rm -rf {} \; 2>/dev/null || true
           
           cd ..
+      
+      - name: Install dependencies
+        script: |
+          echo "Installing dependencies"
+          cd "$FCI_BUILD_DIR"
+          flutter pub get
           
-          # Patch any problematic plugins
-          echo "Setting up Swift plugins..."
+          # Install pods
+          cd ios
+          pod repo update
+          pod install --repo-update
           
-          # Find and fix webview_flutter_wkwebview if it exists
-          WEBVIEW_PATH=$(find ~/.pub-cache/hosted/pub.dev -name "webview_flutter_wkwebview-*" -type d 2>/dev/null | head -n 1)
-          if [ -n "$WEBVIEW_PATH" ]; then
-            echo "Found webview_flutter_wkwebview at: $WEBVIEW_PATH"
-            WEBVIEW_IOS_DIR="$WEBVIEW_PATH/ios"
-            if [ -d "$WEBVIEW_IOS_DIR" ]; then
-              echo "Checking webview_flutter_wkwebview iOS directory"
-              find "$WEBVIEW_IOS_DIR" -name "*.swift" -exec chmod 644 {} \; 2>/dev/null || true
-              echo "Fixed permissions for webview_flutter_wkwebview Swift files"
-            fi
-          else
-            echo "Could not find webview_flutter_wkwebview plugin"
-          fi
+          # Remove privacy bundles after pod install
+          find . -name "*_privacy.bundle" -type d -exec rm -rf {} \; 2>/dev/null || true
+          find . -name "*-privacy.bundle" -type d -exec rm -rf {} \; 2>/dev/null || true
+          find . -name "*Privacy.bundle" -type d -exec rm -rf {} \; 2>/dev/null || true
           
-          # Find and fix url_launcher_ios if it exists
-          URL_LAUNCHER_PATH=$(find ~/.pub-cache/hosted/pub.dev -name "url_launcher_ios-*" -type d 2>/dev/null | head -n 1)
-          if [ -n "$URL_LAUNCHER_PATH" ]; then
-            echo "Found url_launcher_ios at: $URL_LAUNCHER_PATH"
-            URL_LAUNCHER_IOS_DIR="$URL_LAUNCHER_PATH/ios"
-            if [ -d "$URL_LAUNCHER_IOS_DIR" ]; then
-              echo "Checking url_launcher_ios iOS directory"
-              find "$URL_LAUNCHER_IOS_DIR" -name "*.swift" -exec chmod 644 {} \; 2>/dev/null || true
-              echo "Fixed permissions for url_launcher_ios Swift files"
-            fi
-          else
-            echo "Could not find url_launcher_ios plugin"
-          fi
-          
-          # Check for sign_in_with_apple plugin and fix if needed
-          SIGN_IN_APPLE_PATH=$(find ~/.pub-cache/hosted/pub.dev -name "sign_in_with_apple-*" -type d 2>/dev/null | head -n 1)
-          if [ -n "$SIGN_IN_APPLE_PATH" ]; then
-            echo "Found sign_in_with_apple at: $SIGN_IN_APPLE_PATH"
-            SIGN_IN_APPLE_IOS_DIR="$SIGN_IN_APPLE_PATH/ios"
-            if [ -d "$SIGN_IN_APPLE_IOS_DIR" ]; then
-              echo "Checking sign_in_with_apple iOS directory"
-              find "$SIGN_IN_APPLE_IOS_DIR" -name "*.swift" -exec chmod 644 {} \; 2>/dev/null || true
-              echo "Fixed permissions for sign_in_with_apple Swift files"
-            fi
-          else
-            echo "Could not find sign_in_with_apple plugin - this is expected if the app doesn't use it"
-          fi
+          cd ..
+      
       - name: Set up Firebase configuration
         script: |
           echo "Setting up Firebase configuration"
-          mkdir -p "${FCI_BUILD_DIR}/ios/Runner"
-          echo "$IOS_FIREBASE_CONFIG" > "${FCI_BUILD_DIR}/ios/Runner/GoogleService-Info.plist"
-      - name: Flutter build iOS
+          echo "$IOS_FIREBASE_CONFIG" > "$FCI_BUILD_DIR/ios/Runner/GoogleService-Info.plist"
+      
+      - name: Build iOS app
         script: |
-          # Build iOS app
           echo "Building iOS app"
           cd "$FCI_BUILD_DIR"
-          
-          # Ensure we have the latest Flutter setup
-          flutter clean
-          flutter pub get
-          
-          # Remove any privacy bundles before building
-          echo "Removing privacy bundles before build..."
-          find . -name "*_privacy.bundle" -type d -exec rm -rf {} \; 2>/dev/null || true
-          find . -name "*-privacy.bundle" -type d -exec rm -rf {} \; 2>/dev/null || true
-          find . -name "*Privacy.bundle" -type d -exec rm -rf {} \; 2>/dev/null || true
-          
-          # Verify code signing setup
-          cd ios
-          security find-identity -v -p codesigning || {
-            echo "Code signing certificates not found, re-adding..."
-            keychain add-certificates
-          }
-          cd ..
-          
-          # Build iOS app
           flutter build ios --release --no-codesign
-          
-          # Create IPA
-          cd ios
-          
-          # Ensure team ID is set in exportOptions.plist
-          sed -i '' "s/\$(DEVELOPMENT_TEAM)/${XCODE_DEVELOPMENT_TEAM}/g" exportOptions.plist
-          
-          # Try multiple methods to create IPA
-          echo "Creating IPA using xcodebuild archive and exportArchive"
-          ARCHIVE_PATH="$FCI_BUILD_DIR/ios/build/Runner.xcarchive"
-          xcodebuild -workspace Runner.xcworkspace -scheme Runner -configuration Release clean archive -archivePath "$ARCHIVE_PATH" -allowProvisioningUpdates || {
-            echo "Archive failed, trying alternative approach"
-            xcodebuild -workspace Runner.xcworkspace -scheme Runner -configuration Release clean archive -archivePath "$ARCHIVE_PATH" -allowProvisioningUpdates CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM="${XCODE_DEVELOPMENT_TEAM}" || {
-              echo "Second archive attempt failed, trying with explicit signing"
-              xcodebuild -workspace Runner.xcworkspace -scheme Runner -configuration Release clean archive -archivePath "$ARCHIVE_PATH" -allowProvisioningUpdates CODE_SIGN_IDENTITY="Apple Distribution" PROVISIONING_PROFILE_SPECIFIER="match AppStore com.pinewraps.app" || {
-                echo "All archive attempts failed"
-                exit 1
-              }
-            }
-          }
-          
-          # Export IPA
-          echo "Exporting archive to IPA"
-          if [ -d "$ARCHIVE_PATH" ]; then
-            xcodebuild -exportArchive -archivePath "$ARCHIVE_PATH" -exportPath build/ios/ipa -exportOptionsPlist exportOptions.plist || {
-              echo "Export failed, trying alternative approach"
-              # Try with manual signing
-              xcodebuild -exportArchive -archivePath "$ARCHIVE_PATH" -exportPath build/ios/ipa -exportOptionsPlist exportOptions.plist -allowProvisioningUpdates || {
-                echo "Second export attempt failed, trying with explicit team ID"
-                # Create a temporary exportOptions.plist with explicit team ID
-                cp exportOptions.plist exportOptions.temp.plist
-                sed -i '' "s/\$(DEVELOPMENT_TEAM)/${XCODE_DEVELOPMENT_TEAM}/g" exportOptions.temp.plist
-                xcodebuild -exportArchive -archivePath "$ARCHIVE_PATH" -exportPath build/ios/ipa -exportOptionsPlist exportOptions.temp.plist -allowProvisioningUpdates || {
-                  echo "All export attempts failed"
-                  exit 1
-                }
-                rm exportOptions.temp.plist
-              }
-            }
-          else
-            echo "Archive not found, skipping export"
-            exit 1
-          fi
-      - name: Create IPA
+      
+      - name: Package iOS app
         script: |
+          echo "Packaging iOS app"
           cd "$FCI_BUILD_DIR"
           
-          # Check if the archive exists
-          if [ -d "$FCI_BUILD_DIR/build/ios/archive/Runner.xcarchive" ]; then
-            echo "Archive exists, proceeding with export"
-            
-            # Create the export directory
-            mkdir -p "$FCI_BUILD_DIR/build/ios/ipa"
-            
-            # Export the IPA
-            xcodebuild -exportArchive \
-              -archivePath "$FCI_BUILD_DIR/build/ios/archive/Runner.xcarchive" \
-              -exportOptionsPlist "$FCI_BUILD_DIR/ios/exportOptions.plist" \
-              -exportPath "$FCI_BUILD_DIR/build/ios/ipa" \
-              -allowProvisioningUpdates
-            
-            # Verify IPA was created
-            if [ -d "$FCI_BUILD_DIR/build/ios/ipa" ]; then
-              echo "IPA created successfully:"
-              ls -la "$FCI_BUILD_DIR/build/ios/ipa"
-            else
-              echo "Failed to create IPA"
-              exit 1
-            fi
-          else
-            echo "Archive not found at path $FCI_BUILD_DIR/build/ios/archive/Runner.xcarchive"
-            echo "Listing contents of build directory:"
-            find "$FCI_BUILD_DIR/build" -type d | sort
-            exit 1
-          fi
+          # Create archive
+          xcode-project build-ipa \
+            --workspace ios/Runner.xcworkspace \
+            --scheme Runner \
+            --config Release
+    
     artifacts:
       - build/ios/ipa/*.ipa
       - build/ios/xcarchive/*.xcarchive
+    
+    publishing:
+      email:
+        recipients:
+          - sylvester@pinewraps.com
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true
 
   android-workflow:
     name: Android Workflow
     instance_type: mac_mini_m1
     environment:
       flutter: stable
+      java: 11
+      android_signing:
+        - keystore_reference
     scripts:
-      - name: Set up keystore
+      - name: Clean build environment
         script: |
-          echo "Setting up Android keystore"
-          if [ -n "${ANDROID_KEYSTORE}" ]; then
-            # Check if the variable is valid base64
-            if echo "${ANDROID_KEYSTORE}" | base64 -d > /dev/null 2>&1; then
-              echo "Decoding Android keystore"
-              echo "${ANDROID_KEYSTORE}" | base64 --decode > "${FCI_BUILD_DIR}/keystore.jks"
-              echo "Keystore file created successfully"
-              
-              # Create key.properties file if all required variables are set
-              if [ -n "${ANDROID_KEYSTORE_PASSWORD}" ] && [ -n "${ANDROID_KEY_ALIAS}" ] && [ -n "${ANDROID_KEY_PASSWORD}" ]; then
-                echo "Creating key.properties file"
-                mkdir -p "${FCI_BUILD_DIR}/android"
-                cat >> "${FCI_BUILD_DIR}/android/key.properties" << EOF
-                storeFile=${FCI_BUILD_DIR}/keystore.jks
-                storePassword=${ANDROID_KEYSTORE_PASSWORD}
-                keyAlias=${ANDROID_KEY_ALIAS}
-                keyPassword=${ANDROID_KEY_PASSWORD}
-                EOF
-                echo "key.properties file created successfully"
-              else
-                echo "Warning: Missing Android keystore credentials. key.properties file not created."
-              fi
-            else
-              echo "Warning: ANDROID_KEYSTORE is not valid base64. Keystore not created."
-            fi
-          else
-            echo "ANDROID_KEYSTORE not set. Skipping keystore setup."
-          fi
+          echo "Cleaning build environment"
+          cd "$FCI_BUILD_DIR"
+          flutter clean
           
-          # Set up Firebase configuration if needed
-          if [ -n "${ANDROID_FIREBASE_CONFIG}" ]; then
-            echo "Setting up Android Firebase configuration"
-            mkdir -p "${FCI_BUILD_DIR}/android/app"
-            # Check if the variable is valid base64
-            if echo "${ANDROID_FIREBASE_CONFIG}" | base64 -d > /dev/null 2>&1; then
-              echo "Decoding Android Firebase configuration"
-              echo "${ANDROID_FIREBASE_CONFIG}" | base64 --decode > "${FCI_BUILD_DIR}/android/app/google-services.json"
-              echo "Android Firebase configuration file created successfully"
-            else
-              echo "Warning: ANDROID_FIREBASE_CONFIG is not valid base64. Skipping Firebase configuration."
-            fi
-          else
-            echo "ANDROID_FIREBASE_CONFIG not set. Skipping Firebase configuration."
-          fi
-          
-      - name: Flutter build APK and AppBundle
+          # Clean Android specific artifacts
+          cd android
+          ./gradlew clean
+          cd ..
+      
+      - name: Install dependencies
         script: |
-          cd "${FCI_BUILD_DIR}"
-          # Uncomment the following line if you need to build a specific flavor
-          # flutter build apk --release --flavor production
-          flutter build apk --release
+          echo "Installing dependencies"
+          cd "$FCI_BUILD_DIR"
+          flutter pub get
+      
+      - name: Set up Firebase configuration
+        script: |
+          echo "Setting up Firebase configuration"
+          echo "$ANDROID_FIREBASE_CONFIG" > "$FCI_BUILD_DIR/android/app/google-services.json"
+      
+      - name: Build Android app
+        script: |
+          echo "Building Android app"
+          cd "$FCI_BUILD_DIR"
           flutter build appbundle --release
+          flutter build apk --release
+    
     artifacts:
       - build/app/outputs/flutter-apk/*.apk
       - build/app/outputs/bundle/release/*.aab
-      
+    
+    publishing:
+      email:
+        recipients:
+          - sylvester@pinewraps.com
+      google_play:
+        credentials: $GCLOUD_SERVICE_ACCOUNT_CREDENTIALS
+        track: internal
+
   combined-workflow:
     name: iOS and Android Build
     instance_type: mac_mini_m1
-    environment:
-      xcode: latest
-      cocoapods: default
-      flutter: stable
-      ios_signing:
-        distribution_type: app_store
-        bundle_identifier: com.pinewraps.app
-      vars:
-        IOS_BUNDLE_ID: "com.pinewraps.app"
-        APP_STORE_CONNECT_ISSUER_ID: ${APP_STORE_CONNECT_ISSUER_ID}
-        APP_STORE_CONNECT_KEY_IDENTIFIER: ${APP_STORE_CONNECT_KEY_IDENTIFIER}
-        APP_STORE_CONNECT_PRIVATE_KEY: ${APP_STORE_CONNECT_PRIVATE_KEY}
     triggering:
       events:
         - push
       branch_patterns:
-        - pattern: master
+        - pattern: main
           include: true
+    environment:
+      xcode: latest
+      cocoapods: default
+      flutter: stable
+      java: 11
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.pinewraps.app
+      android_signing:
+        - keystore_reference
+      vars:
+        IOS_BUNDLE_ID: "com.pinewraps.app"
     scripts:
-      # iOS setup and build
-      - name: Set up code signing settings on Xcode project
+      - name: Clean build environment
         script: |
+          echo "Cleaning build environment"
           cd "$FCI_BUILD_DIR"
+          flutter clean
           
-          # Create keychain
-          echo "Creating keychain"
-          keychain_name="ios-build.keychain"
-          keychain_password="temporary_password"
-          security create-keychain -p "$keychain_password" "$keychain_name"
-          security list-keychains -d user -s "$keychain_name" $(security list-keychains -d user | sed s/\"//g)
-          security default-keychain -s "$keychain_name"
-          security unlock-keychain -p "$keychain_password" "$keychain_name"
-          security set-keychain-settings
+          # Clean iOS specific artifacts
+          cd ios
+          rm -rf Pods
+          rm -rf Podfile.lock
+          rm -rf .symlinks
+          rm -rf Flutter/Flutter.framework
+          rm -rf Flutter/Flutter.podspec
+          rm -rf Flutter/App.framework
+          rm -rf build
           
-          # Use app-store-connect to fetch signing files
-          echo "Fetching signing files"
-          app-store-connect fetch-signing-files com.pinewraps.app \
+          # Remove privacy bundles
+          find . -name "*_privacy.bundle" -type d -exec rm -rf {} \; 2>/dev/null || true
+          find . -name "*-privacy.bundle" -type d -exec rm -rf {} \; 2>/dev/null || true
+          find . -name "*Privacy.bundle" -type d -exec rm -rf {} \; 2>/dev/null || true
+          
+          cd ..
+          
+          # Clean Android specific artifacts
+          cd android
+          ./gradlew clean
+          cd ..
+      
+      - name: Install dependencies
+        script: |
+          echo "Installing dependencies"
+          cd "$FCI_BUILD_DIR"
+          flutter pub get
+          
+          # Install pods
+          cd ios
+          pod repo update
+          pod install --repo-update
+          
+          # Remove privacy bundles after pod install
+          find . -name "*_privacy.bundle" -type d -exec rm -rf {} \; 2>/dev/null || true
+          find . -name "*-privacy.bundle" -type d -exec rm -rf {} \; 2>/dev/null || true
+          find . -name "*Privacy.bundle" -type d -exec rm -rf {} \; 2>/dev/null || true
+          
+          cd ..
+      
+      - name: Set up code signing for iOS
+        script: |
+          echo "Setting up code signing for iOS"
+          keychain initialize
+          app-store-connect fetch-signing-files "$IOS_BUNDLE_ID" \
             --type IOS_APP_STORE \
-            --create \
-            --save-keychain-password "$keychain_password" \
-            --keychain "$keychain_name"
-          
-          # Set up code signing settings on Xcode project
-          echo "Setting up code signing settings on Xcode project"
-          xcode-project use-profiles --project ios/Runner.xcodeproj
-
-      - name: Patch sqflite_darwin plugin
+            --create
+          keychain add-certificates
+      
+      - name: Set up Firebase configuration
         script: |
-          cd "$FCI_BUILD_DIR"
-          
-          # Find the sqflite_darwin plugin path
-          SQFLITE_PATH=$(find ~/.pub-cache/hosted/pub.dev -name "sqflite_darwin-*" -type d | head -n 1)
-          
-          if [ -n "$SQFLITE_PATH" ]; then
-            echo "Found sqflite_darwin at: $SQFLITE_PATH"
-            
-            # Patch the source files to add the required SQLite flags
-            SQFLITE_SOURCES="$SQFLITE_PATH/darwin/sqflite_darwin/Sources/sqflite_darwin"
-            
-            if [ -d "$SQFLITE_SOURCES" ]; then
-              echo "Patching sqflite_darwin source files"
-              
-              # Create a backup of original files
-              mkdir -p "$SQFLITE_SOURCES/backup"
-              cp "$SQFLITE_SOURCES/SqfliteDatabase.m" "$SQFLITE_SOURCES/backup/"
-              cp "$SQFLITE_SOURCES/SqflitePlugin.m" "$SQFLITE_SOURCES/backup/"
-              cp "$SQFLITE_SOURCES/SqfliteOperation.m" "$SQFLITE_SOURCES/backup/"
-              
-              # Create patch header file
-              echo "#ifndef SQFLITE_DARWIN_PATCH_H" > "$SQFLITE_SOURCES/sqflite_darwin_patch.h"
-              echo "#define SQFLITE_DARWIN_PATCH_H" >> "$SQFLITE_SOURCES/sqflite_darwin_patch.h"
-              echo "" >> "$SQFLITE_SOURCES/sqflite_darwin_patch.h"
-              echo "#define SQLITE_ENABLE_COLUMN_METADATA 1" >> "$SQFLITE_SOURCES/sqflite_darwin_patch.h"
-              echo "" >> "$SQFLITE_SOURCES/sqflite_darwin_patch.h"
-              echo "#endif /* SQFLITE_DARWIN_PATCH_H */" >> "$SQFLITE_SOURCES/sqflite_darwin_patch.h"
-              
-              # Add SQLite column metadata preprocessor definition to all .m files
-              for file in "$SQFLITE_SOURCES/SqfliteDatabase.m" "$SQFLITE_SOURCES/SqflitePlugin.m" "$SQFLITE_SOURCES/SqfliteOperation.m"; do
-                echo "#define SQLITE_ENABLE_COLUMN_METADATA 1" > "$file.new"
-                echo "#import \"sqflite_darwin_patch.h\"" >> "$file.new"
-                cat "$file" >> "$file.new"
-                mv "$file.new" "$file"
-              done
-              
-              echo "Patched sqflite_darwin source files successfully"
-            else
-              echo "Could not find sqflite_darwin source directory at: $SQFLITE_SOURCES"
-            fi
-          else
-            echo "Could not find sqflite_darwin plugin"
-          fi
-
-      - name: Set up iOS Firebase configuration
+          echo "Setting up Firebase configuration"
+          echo "$IOS_FIREBASE_CONFIG" > "$FCI_BUILD_DIR/ios/Runner/GoogleService-Info.plist"
+          echo "$ANDROID_FIREBASE_CONFIG" > "$FCI_BUILD_DIR/android/app/google-services.json"
+      
+      - name: Build iOS app
         script: |
-          echo "Setting up iOS Firebase configuration"
-          mkdir -p "${FCI_BUILD_DIR}/ios/Runner"
-          # Create the file manually from the known content
-          cat > "${FCI_BUILD_DIR}/ios/Runner/GoogleService-Info.plist" << 'EOF'
-          <?xml version="1.0" encoding="UTF-8"?>
-          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-          <plist version="1.0">
-          <dict>
-            <key>CLIENT_ID</key>
-            <string>181991178384-0768pbr5j4b0svq374ql8jmqm8lha5gi.apps.googleusercontent.com</string>
-            <key>REVERSED_CLIENT_ID</key>
-            <string>com.googleusercontent.apps.181991178384-0768pbr5j4b0svq374ql8jmqm8lha5gi</string>
-            <key>ANDROID_CLIENT_ID</key>
-            <string>181991178384-egso4atj877ghd4c2tgiv9rg2c15715o.apps.googleusercontent.com</string>
-            <key>API_KEY</key>
-            <string>AIzaSyAacRdIMeUJyGAUeEj8Qb2bliZ-tySRCj8</string>
-            <key>GCM_SENDER_ID</key>
-            <string>181991178384</string>
-            <key>PLIST_VERSION</key>
-            <string>1</string>
-            <key>BUNDLE_ID</key>
-            <string>com.pinewraps.app</string>
-            <key>PROJECT_ID</key>
-            <string>pinewraps-23e8a</string>
-            <key>STORAGE_BUCKET</key>
-            <string>pinewraps-23e8a.firebasestorage.app</string>
-            <key>IS_ADS_ENABLED</key>
-            <false></false>
-            <key>IS_ANALYTICS_ENABLED</key>
-            <false></false>
-            <key>IS_APPINVITE_ENABLED</key>
-            <true></true>
-            <key>IS_GCM_ENABLED</key>
-            <true></true>
-            <key>IS_SIGNIN_ENABLED</key>
-            <true></true>
-            <key>GOOGLE_APP_ID</key>
-            <string>1:181991178384:ios:a5699293807394f7485815</string>
-          </dict>
-          </plist>
-          EOF
-          echo "Created GoogleService-Info.plist manually"
-          
-      - name: iOS Prebuild Script
-        script: |
-          cd "${FCI_BUILD_DIR}"
-          
-          # Make sure the prebuild script is executable
-          chmod +x "${FCI_BUILD_DIR}/ios_prebuild.sh"
-          
-          # Run the prebuild script
-          "${FCI_BUILD_DIR}/ios_prebuild.sh"
-          
-          # Ensure Swift plugins are properly set up
-          echo "Setting up Swift plugins..."
-          SWIFT_PLUGINS=("webview_flutter_wkwebview" "url_launcher_ios" "sign_in_with_apple")
-          
-          for plugin in "${SWIFT_PLUGINS[@]}"; do
-            PLUGIN_PATH=$(find ~/.pub-cache/hosted/pub.dev -name "${plugin}-*" -type d | head -n 1)
-            
-            if [ -n "$PLUGIN_PATH" ]; then
-              echo "Found $plugin at: $PLUGIN_PATH"
-              
-              # Check if there's a Swift module
-              if [ -d "$PLUGIN_PATH/ios" ]; then
-                echo "Checking $plugin iOS directory"
-                
-                # Make sure all Swift files have the correct permissions
-                find "$PLUGIN_PATH/ios" -name "*.swift" -exec chmod +r {} \;
-                
-                echo "Fixed permissions for $plugin Swift files"
-              fi
-            else
-              echo "Could not find $plugin plugin"
-            fi
-          done
-          
-      - name: Flutter build iOS
-        script: |
-          cd "${FCI_BUILD_DIR}"
-          
-          # Skip flutter clean and pub get as they're already run in the prebuild script
           echo "Building iOS app"
-          
-          # Make sure the build script is executable
-          chmod +x "${FCI_BUILD_DIR}/ios/build_ios.sh"
-          
-          # Run the build script
-          "${FCI_BUILD_DIR}/ios/build_ios.sh"
-          
-          # Create a directory for the IPA
-          mkdir -p build/ios/ipa
-          
-          # Export the archive to IPA
-          echo "Exporting archive to IPA"
-          # Only attempt to export if the archive exists
-          if [ -d "build/ios/archive/Runner.xcarchive" ]; then
-            xcodebuild -exportArchive \
-              -archivePath build/ios/archive/Runner.xcarchive \
-              -exportOptionsPlist ios/exportOptions.plist \
-              -exportPath build/ios/ipa/ \
-              -allowProvisioningUpdates
-          else
-            echo "Archive not found, skipping export"
-            exit 1
-          fi
-          
-      - name: Create iOS IPA
-        script: |
           cd "$FCI_BUILD_DIR"
-          
-          # Check if the archive exists
-          if [ -d "$FCI_BUILD_DIR/build/ios/archive/Runner.xcarchive" ]; then
-            echo "Archive exists, proceeding with export"
-            
-            # Create the export directory
-            mkdir -p "$FCI_BUILD_DIR/build/ios/ipa"
-            
-            # Export the IPA
-            xcodebuild -exportArchive \
-              -archivePath "$FCI_BUILD_DIR/build/ios/archive/Runner.xcarchive" \
-              -exportOptionsPlist "$FCI_BUILD_DIR/ios/exportOptions.plist" \
-              -exportPath "$FCI_BUILD_DIR/build/ios/ipa" \
-              -allowProvisioningUpdates
-            
-            # Verify IPA was created
-            if [ -d "$FCI_BUILD_DIR/build/ios/ipa" ]; then
-              echo "IPA created successfully:"
-              ls -la "$FCI_BUILD_DIR/build/ios/ipa"
-            else
-              echo "Failed to create IPA"
-              exit 1
-            fi
-          else
-            echo "Archive not found at path $FCI_BUILD_DIR/build/ios/archive/Runner.xcarchive"
-            echo "Listing contents of build directory:"
-            find "$FCI_BUILD_DIR/build" -type d | sort
-            exit 1
-          fi
-          
-      # Android setup and build
-      - name: Set up Android keystore
+          flutter build ios --release --no-codesign
+      
+      - name: Package iOS app
         script: |
-          echo "Setting up Android keystore"
-          if [ -n "${ANDROID_KEYSTORE}" ]; then
-            # Check if the variable is valid base64
-            if echo "${ANDROID_KEYSTORE}" | base64 -d > /dev/null 2>&1; then
-              echo "Decoding Android keystore"
-              echo "${ANDROID_KEYSTORE}" | base64 --decode > "${FCI_BUILD_DIR}/keystore.jks"
-              echo "Keystore file created successfully"
-              
-              # Create key.properties file if all required variables are set
-              if [ -n "${ANDROID_KEYSTORE_PASSWORD}" ] && [ -n "${ANDROID_KEY_ALIAS}" ] && [ -n "${ANDROID_KEY_PASSWORD}" ]; then
-                echo "Creating key.properties file"
-                mkdir -p "${FCI_BUILD_DIR}/android"
-                cat >> "${FCI_BUILD_DIR}/android/key.properties" << EOF
-                storeFile=${FCI_BUILD_DIR}/keystore.jks
-                storePassword=${ANDROID_KEYSTORE_PASSWORD}
-                keyAlias=${ANDROID_KEY_ALIAS}
-                keyPassword=${ANDROID_KEY_PASSWORD}
-                EOF
-                echo "key.properties file created successfully"
-              else
-                echo "Warning: Missing Android keystore credentials. key.properties file not created."
-              fi
-            else
-              echo "Warning: ANDROID_KEYSTORE is not valid base64. Keystore not created."
-            fi
-          else
-            echo "ANDROID_KEYSTORE not set. Skipping keystore setup."
-          fi
-          
-          # Set up Firebase configuration if needed
-          if [ -n "${ANDROID_FIREBASE_CONFIG}" ]; then
-            echo "Setting up Android Firebase configuration"
-            mkdir -p "${FCI_BUILD_DIR}/android/app"
-            # Check if the variable is valid base64
-            if echo "${ANDROID_FIREBASE_CONFIG}" | base64 -d > /dev/null 2>&1; then
-              echo "Decoding Android Firebase configuration"
-              echo "${ANDROID_FIREBASE_CONFIG}" | base64 --decode > "${FCI_BUILD_DIR}/android/app/google-services.json"
-              echo "Android Firebase configuration file created successfully"
-            else
-              echo "Warning: ANDROID_FIREBASE_CONFIG is not valid base64. Skipping Firebase configuration."
-            fi
-          else
-            echo "ANDROID_FIREBASE_CONFIG not set. Skipping Firebase configuration."
-          fi
-          
-      - name: Flutter build Android
+          echo "Packaging iOS app"
+          cd "$FCI_BUILD_DIR"
+          xcode-project build-ipa \
+            --workspace ios/Runner.xcworkspace \
+            --scheme Runner \
+            --config Release
+      
+      - name: Build Android app
         script: |
-          cd "${FCI_BUILD_DIR}"
-          flutter build apk --release
+          echo "Building Android app"
+          cd "$FCI_BUILD_DIR"
           flutter build appbundle --release
+          flutter build apk --release
+    
     artifacts:
       - build/ios/ipa/*.ipa
       - build/ios/xcarchive/*.xcarchive
       - build/app/outputs/flutter-apk/*.apk
       - build/app/outputs/bundle/release/*.aab
+    
     publishing:
       email:
         recipients:
           - sylvester@pinewraps.com
-        notify:
-          success: true
-          failure: true

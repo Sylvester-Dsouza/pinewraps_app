@@ -49,7 +49,7 @@ dependencies:
   webview_flutter_wkwebview: ^3.18.4
   app_links: ^3.4.5
   path_provider: ^2.1.1
-  open_file: ^3.3.2
+  # open_file: ^3.3.2  # Temporarily commented out due to macOS plugin issues
   # Temporarily commented out for Android build
   # sign_in_with_apple: ^5.0.0
   crypto: ^3.0.3
