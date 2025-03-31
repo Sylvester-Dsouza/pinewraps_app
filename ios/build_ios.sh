@@ -8,42 +8,129 @@ cd "$FCI_BUILD_DIR"
 # Skip Flutter clean and pub get as they're already run in the prebuild script
 echo "Skipping Flutter clean and pub get (already run in prebuild script)"
 
-# Find and patch the sqflite_darwin plugin
-echo "Finding and patching sqflite_darwin plugin"
-SQFLITE_PATH=$(find ~/.pub-cache/hosted/pub.dev -name "sqflite_darwin-*" -type d | head -n 1)
+# Patch both sqflite and sqflite_darwin plugins
+echo "Patching SQLite plugins..."
+
+# Regular sqflite plugin
+echo "Patching regular sqflite plugin..."
+SQFLITE_PATH=$(find ~/.pub-cache/hosted/pub.dev -name "sqflite-2.3.0" -type d | head -n 1)
 
 if [ -n "$SQFLITE_PATH" ]; then
-  echo "Found sqflite_darwin at: $SQFLITE_PATH"
+  echo "Found sqflite at: $SQFLITE_PATH"
   
   # Patch the source files to add the required SQLite flags
-  SQFLITE_SOURCES="$SQFLITE_PATH/darwin/sqflite_darwin/Sources/sqflite_darwin"
+  SQFLITE_SOURCES="$SQFLITE_PATH/ios/Classes"
   
   if [ -d "$SQFLITE_SOURCES" ]; then
-    echo "Patching sqflite_darwin source files"
+    echo "Patching sqflite source files"
     
-    # Create a backup of original files
-    mkdir -p "$SQFLITE_SOURCES/backup"
-    cp "$SQFLITE_SOURCES/SqfliteDatabase.m" "$SQFLITE_SOURCES/backup/"
-    cp "$SQFLITE_SOURCES/SqflitePlugin.m" "$SQFLITE_SOURCES/backup/"
-    cp "$SQFLITE_SOURCES/SqfliteOperation.m" "$SQFLITE_SOURCES/backup/"
-    
-    # Copy our patch header to the sqflite_darwin directory
-    cp "$FCI_BUILD_DIR/ios/sqflite_darwin_patch.h" "$SQFLITE_SOURCES/"
+    # Create patch header file
+    cat > "$SQFLITE_SOURCES/sqflite_patch.h" << 'EOF'
+#ifndef SQFLITE_PATCH_H
+#define SQFLITE_PATCH_H
+
+#define SQLITE_ENABLE_COLUMN_METADATA 1
+
+#endif /* SQFLITE_PATCH_H */
+EOF
     
     # Add SQLite column metadata preprocessor definition to all .m files
     for file in "$SQFLITE_SOURCES/SqfliteDatabase.m" "$SQFLITE_SOURCES/SqflitePlugin.m" "$SQFLITE_SOURCES/SqfliteOperation.m"; do
-      echo "#define SQLITE_ENABLE_COLUMN_METADATA 1" > "$file.new"
-      echo "#import \"sqflite_darwin_patch.h\"" >> "$file.new"
-      cat "$file" >> "$file.new"
-      mv "$file.new" "$file"
+      if [ -f "$file" ]; then
+        echo "Patching $file"
+        echo "#define SQLITE_ENABLE_COLUMN_METADATA 1" > "$file.new"
+        echo "#import \"sqflite_patch.h\"" >> "$file.new"
+        cat "$file" >> "$file.new"
+        mv "$file.new" "$file"
+      else
+        echo "File $file not found, skipping"
+      fi
+    done
+    
+    echo "Patched sqflite source files successfully"
+  else
+    echo "Could not find sqflite source directory at: $SQFLITE_SOURCES"
+  fi
+else
+  echo "Could not find sqflite plugin"
+fi
+
+# Sqflite_darwin plugin
+echo "Patching sqflite_darwin plugin..."
+SQFLITE_DARWIN_PATH=$(find ~/.pub-cache/hosted/pub.dev -name "sqflite_darwin-*" -type d | head -n 1)
+
+if [ -n "$SQFLITE_DARWIN_PATH" ]; then
+  echo "Found sqflite_darwin at: $SQFLITE_DARWIN_PATH"
+  
+  # Patch the source files to add the required SQLite flags
+  SQFLITE_DARWIN_SOURCES="$SQFLITE_DARWIN_PATH/darwin/sqflite_darwin/Sources/sqflite_darwin"
+  
+  if [ -d "$SQFLITE_DARWIN_SOURCES" ]; then
+    echo "Patching sqflite_darwin source files"
+    
+    # Create patch header file
+    cat > "$SQFLITE_DARWIN_SOURCES/sqflite_darwin_patch.h" << 'EOF'
+#ifndef SQFLITE_DARWIN_PATCH_H
+#define SQFLITE_DARWIN_PATCH_H
+
+#define SQLITE_ENABLE_COLUMN_METADATA 1
+
+#endif /* SQFLITE_DARWIN_PATCH_H */
+EOF
+    
+    # Add SQLite column metadata preprocessor definition to all .m files
+    for file in "$SQFLITE_DARWIN_SOURCES/SqfliteDatabase.m" "$SQFLITE_DARWIN_SOURCES/SqflitePlugin.m" "$SQFLITE_DARWIN_SOURCES/SqfliteOperation.m"; do
+      if [ -f "$file" ]; then
+        echo "Patching $file"
+        echo "#define SQLITE_ENABLE_COLUMN_METADATA 1" > "$file.new"
+        echo "#import \"sqflite_darwin_patch.h\"" >> "$file.new"
+        cat "$file" >> "$file.new"
+        mv "$file.new" "$file"
+      else
+        echo "File $file not found, skipping"
+      fi
     done
     
     echo "Patched sqflite_darwin source files successfully"
   else
-    echo "Could not find sqflite_darwin source directory at: $SQFLITE_SOURCES"
+    echo "Could not find sqflite_darwin source directory at: $SQFLITE_DARWIN_SOURCES"
   fi
 else
   echo "Could not find sqflite_darwin plugin"
+fi
+
+# Patch open_file_ios plugin
+echo "Checking for open_file_ios plugin..."
+OPENFILE_PATH=$(find ~/.pub-cache/hosted/pub.dev -name "open_file_ios-*" -type d | head -n 1)
+
+if [ -n "$OPENFILE_PATH" ]; then
+  echo "Found open_file_ios at: $OPENFILE_PATH"
+  
+  # Check if there are any issues with the plugin
+  OPENFILE_SOURCES="$OPENFILE_PATH/ios/Classes"
+  
+  if [ -d "$OPENFILE_SOURCES" ]; then
+    echo "Checking open_file_ios source files"
+    
+    # Fix any issues with OpenFilePlugin.m if needed
+    if [ -f "$OPENFILE_SOURCES/OpenFilePlugin.m" ]; then
+      echo "Found OpenFilePlugin.m, checking for issues..."
+      
+      # For now, we're just making sure the file is readable
+      if [ ! -r "$OPENFILE_SOURCES/OpenFilePlugin.m" ]; then
+        echo "OpenFilePlugin.m is not readable, fixing permissions..."
+        chmod +r "$OPENFILE_SOURCES/OpenFilePlugin.m"
+      fi
+    else
+      echo "OpenFilePlugin.m not found"
+    fi
+    
+    echo "Checked open_file_ios source files"
+  else
+    echo "Could not find open_file_ios source directory at: $OPENFILE_SOURCES"
+  fi
+else
+  echo "Could not find open_file_ios plugin"
 fi
 
 # Prepare iOS build environment
@@ -55,7 +142,7 @@ echo "Cleaning Pods"
 rm -rf Pods
 rm -f Podfile.lock
 
-# Install pods with special flags for sqflite_darwin
+# Install pods with special flags for sqflite and sqflite_darwin
 echo "Installing Pods"
 pod install --repo-update
 

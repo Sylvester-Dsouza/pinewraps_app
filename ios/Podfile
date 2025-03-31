@@ -41,30 +41,51 @@ target 'Runner' do
   pod 'GoogleUtilities', :modular_headers => true
   pod 'GoogleDataTransport', :modular_headers => true
   
-  # Fix for sqflite_darwin compilation issues
   post_install do |installer|
     installer.pods_project.targets.each do |target|
-      target.build_configurations.each do |config|
-        config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '12.0'
-        
-        # Disable code signing for all pods
-        config.build_settings['CODE_SIGNING_ALLOWED'] = 'NO'
-        config.build_settings['CODE_SIGNING_REQUIRED'] = 'NO'
-        
-        # Special handling for sqflite_darwin
-        if target.name == 'sqflite_darwin'
+      flutter_additional_ios_build_settings(target)
+      
+      # Add SQLite flags to sqflite targets
+      if ['sqflite', 'sqflite_darwin'].include?(target.name)
+        target.build_configurations.each do |config|
           # Add SQLite flags
           config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] ||= ['$(inherited)']
           config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] << 'SQLITE_ENABLE_COLUMN_METADATA=1'
           
-          # Add compiler flags
-          config.build_settings['OTHER_CFLAGS'] ||= ['$(inherited)']
-          config.build_settings['OTHER_CFLAGS'] << '-DSQLITE_ENABLE_COLUMN_METADATA'
-          
-          # Improve header search paths
+          # Add header search paths
           config.build_settings['HEADER_SEARCH_PATHS'] ||= ['$(inherited)']
-          config.build_settings['HEADER_SEARCH_PATHS'] << '${PODS_ROOT}/FMDB/src/fmdb'
-          config.build_settings['HEADER_SEARCH_PATHS'] << '${PODS_ROOT}/SQLCipher'
+          if target.name == 'sqflite'
+            config.build_settings['HEADER_SEARCH_PATHS'] << '"${PODS_ROOT}/../.symlinks/plugins/sqflite/ios/Classes"'
+          elsif target.name == 'sqflite_darwin'
+            config.build_settings['HEADER_SEARCH_PATHS'] << '"${PODS_ROOT}/../.symlinks/plugins/sqflite_darwin/darwin/sqflite_darwin/Sources/sqflite_darwin"'
+          end
+          
+          # Disable code signing for these targets
+          config.build_settings['CODE_SIGNING_ALLOWED'] = 'NO'
+          config.build_settings['CODE_SIGNING_REQUIRED'] = 'NO'
+        end
+      end
+      
+      # Fix open_file_ios issues if needed
+      if target.name == 'open_file_ios'
+        target.build_configurations.each do |config|
+          # Ensure proper compiler flags
+          config.build_settings['OTHER_LDFLAGS'] ||= ['$(inherited)']
+          
+          # Disable code signing for this target
+          config.build_settings['CODE_SIGNING_ALLOWED'] = 'NO'
+          config.build_settings['CODE_SIGNING_REQUIRED'] = 'NO'
+        end
+      end
+      
+      # Fix for all targets
+      target.build_configurations.each do |config|
+        config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '12.0'
+        
+        # Disable code signing for all pods to avoid issues
+        if config.build_settings['WRAPPER_EXTENSION'] == 'bundle'
+          config.build_settings['CODE_SIGNING_ALLOWED'] = 'NO'
+          config.build_settings['CODE_SIGNING_REQUIRED'] = 'NO'
         end
       end
     end
