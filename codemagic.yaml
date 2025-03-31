@@ -25,15 +25,28 @@ workflows:
           if [ -n "$APP_STORE_CONNECT_ISSUER_ID" ] && [ -n "$APP_STORE_CONNECT_KEY_IDENTIFIER" ] && [ -n "$APP_STORE_CONNECT_PRIVATE_KEY" ]; then
             echo "Using App Store Connect API for code signing"
             
-            # Register the bundle ID if it doesn't exist
-            echo "Registering bundle ID if it doesn't exist..."
-            app-store-connect bundle-ids | grep "$IOS_BUNDLE_ID" || app-store-connect create-bundle-id "$IOS_BUNDLE_ID" "Pinewraps" --platform IOS
+            # Create a temporary file for the private key
+            PRIVATE_KEY_PATH=$(mktemp)
+            echo "$APP_STORE_CONNECT_PRIVATE_KEY" > "$PRIVATE_KEY_PATH"
+            
+            # Check if bundle ID exists
+            echo "Checking if bundle ID exists..."
+            app-store-connect bundle-ids --issuer-id "$APP_STORE_CONNECT_ISSUER_ID" --key-id "$APP_STORE_CONNECT_KEY_IDENTIFIER" --private-key "$PRIVATE_KEY_PATH" | grep -q "$IOS_BUNDLE_ID"
+            
+            # If bundle ID doesn't exist, create it
+            if [ $? -ne 0 ]; then
+              echo "Creating bundle ID..."
+              app-store-connect create-bundle-id --issuer-id "$APP_STORE_CONNECT_ISSUER_ID" --key-id "$APP_STORE_CONNECT_KEY_IDENTIFIER" --private-key "$PRIVATE_KEY_PATH" --name "Pinewraps" --platform IOS "$IOS_BUNDLE_ID"
+            else
+              echo "Bundle ID already exists"
+            fi
             
             # Fetch or create the signing files
             echo "Fetching or creating signing files..."
-            app-store-connect fetch-signing-files "$IOS_BUNDLE_ID" \
-              --type IOS_APP_STORE \
-              --create
+            app-store-connect fetch-signing-files --issuer-id "$APP_STORE_CONNECT_ISSUER_ID" --key-id "$APP_STORE_CONNECT_KEY_IDENTIFIER" --private-key "$PRIVATE_KEY_PATH" --type IOS_APP_STORE --create "$IOS_BUNDLE_ID"
+            
+            # Clean up the temporary file
+            rm "$PRIVATE_KEY_PATH"
             
             # Check if the profile was created successfully
             if [ $? -eq 0 ]; then
@@ -210,15 +223,28 @@ workflows:
           if [ -n "$APP_STORE_CONNECT_ISSUER_ID" ] && [ -n "$APP_STORE_CONNECT_KEY_IDENTIFIER" ] && [ -n "$APP_STORE_CONNECT_PRIVATE_KEY" ]; then
             echo "Using App Store Connect API for code signing"
             
-            # Register the bundle ID if it doesn't exist
-            echo "Registering bundle ID if it doesn't exist..."
-            app-store-connect bundle-ids | grep "$IOS_BUNDLE_ID" || app-store-connect create-bundle-id "$IOS_BUNDLE_ID" "Pinewraps" --platform IOS
+            # Create a temporary file for the private key
+            PRIVATE_KEY_PATH=$(mktemp)
+            echo "$APP_STORE_CONNECT_PRIVATE_KEY" > "$PRIVATE_KEY_PATH"
+            
+            # Check if bundle ID exists
+            echo "Checking if bundle ID exists..."
+            app-store-connect bundle-ids --issuer-id "$APP_STORE_CONNECT_ISSUER_ID" --key-id "$APP_STORE_CONNECT_KEY_IDENTIFIER" --private-key "$PRIVATE_KEY_PATH" | grep -q "$IOS_BUNDLE_ID"
+            
+            # If bundle ID doesn't exist, create it
+            if [ $? -ne 0 ]; then
+              echo "Creating bundle ID..."
+              app-store-connect create-bundle-id --issuer-id "$APP_STORE_CONNECT_ISSUER_ID" --key-id "$APP_STORE_CONNECT_KEY_IDENTIFIER" --private-key "$PRIVATE_KEY_PATH" --name "Pinewraps" --platform IOS "$IOS_BUNDLE_ID"
+            else
+              echo "Bundle ID already exists"
+            fi
             
             # Fetch or create the signing files
             echo "Fetching or creating signing files..."
-            app-store-connect fetch-signing-files "$IOS_BUNDLE_ID" \
-              --type IOS_APP_STORE \
-              --create
+            app-store-connect fetch-signing-files --issuer-id "$APP_STORE_CONNECT_ISSUER_ID" --key-id "$APP_STORE_CONNECT_KEY_IDENTIFIER" --private-key "$PRIVATE_KEY_PATH" --type IOS_APP_STORE --create "$IOS_BUNDLE_ID"
+            
+            # Clean up the temporary file
+            rm "$PRIVATE_KEY_PATH"
             
             # Check if the profile was created successfully
             if [ $? -eq 0 ]; then
