@@ -10,6 +10,44 @@ echo "Getting Flutter dependencies"
 flutter clean
 flutter pub get
 
+# Find and patch the sqflite_darwin plugin
+echo "Finding and patching sqflite_darwin plugin"
+SQFLITE_PATH=$(find ~/.pub-cache/hosted/pub.dev -name "sqflite_darwin-*" -type d | head -n 1)
+
+if [ -n "$SQFLITE_PATH" ]; then
+  echo "Found sqflite_darwin at: $SQFLITE_PATH"
+  
+  # Patch the source files to add the required SQLite flags
+  SQFLITE_SOURCES="$SQFLITE_PATH/darwin/sqflite_darwin/Sources/sqflite_darwin"
+  
+  if [ -d "$SQFLITE_SOURCES" ]; then
+    echo "Patching sqflite_darwin source files"
+    
+    # Create a backup of original files
+    mkdir -p "$SQFLITE_SOURCES/backup"
+    cp "$SQFLITE_SOURCES/SqfliteDatabase.m" "$SQFLITE_SOURCES/backup/"
+    cp "$SQFLITE_SOURCES/SqflitePlugin.m" "$SQFLITE_SOURCES/backup/"
+    cp "$SQFLITE_SOURCES/SqfliteOperation.m" "$SQFLITE_SOURCES/backup/"
+    
+    # Copy our patch header to the sqflite_darwin directory
+    cp "$FCI_BUILD_DIR/ios/sqflite_darwin_patch.h" "$SQFLITE_SOURCES/"
+    
+    # Add SQLite column metadata preprocessor definition to all .m files
+    for file in "$SQFLITE_SOURCES/SqfliteDatabase.m" "$SQFLITE_SOURCES/SqflitePlugin.m" "$SQFLITE_SOURCES/SqfliteOperation.m"; do
+      echo "#define SQLITE_ENABLE_COLUMN_METADATA 1" > "$file.new"
+      echo "#import \"sqflite_darwin_patch.h\"" >> "$file.new"
+      cat "$file" >> "$file.new"
+      mv "$file.new" "$file"
+    done
+    
+    echo "Patched sqflite_darwin source files successfully"
+  else
+    echo "Could not find sqflite_darwin source directory at: $SQFLITE_SOURCES"
+  fi
+else
+  echo "Could not find sqflite_darwin plugin"
+fi
+
 # Prepare iOS build environment
 echo "Preparing iOS build environment"
 cd ios
@@ -42,6 +80,8 @@ xcodebuild clean archive \
   DEVELOPMENT_TEAM="4J9WXB52YV" \
   CODE_SIGN_STYLE="Automatic" \
   COMPILER_INDEX_STORE_ENABLE=NO \
+  OTHER_CFLAGS="-DSQLITE_ENABLE_COLUMN_METADATA" \
+  GCC_PREPROCESSOR_DEFINITIONS="SQLITE_ENABLE_COLUMN_METADATA=1 \$(inherited)" \
   -allowProvisioningUpdates
 
 # Check if archive was created

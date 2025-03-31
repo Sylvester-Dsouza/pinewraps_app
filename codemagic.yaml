@@ -300,7 +300,58 @@ workflows:
           # Set up code signing settings on Xcode project
           echo "Setting up code signing settings on Xcode project"
           xcode-project use-profiles --project ios/Runner.xcodeproj
+
+      - name: Patch sqflite_darwin plugin
+        script: |
+          cd "$FCI_BUILD_DIR"
           
+          # Find the sqflite_darwin plugin path
+          SQFLITE_PATH=$(find ~/.pub-cache/hosted/pub.dev -name "sqflite_darwin-*" -type d | head -n 1)
+          
+          if [ -n "$SQFLITE_PATH" ]; then
+            echo "Found sqflite_darwin at: $SQFLITE_PATH"
+            
+            # Patch the source files to add the required SQLite flags
+            SQFLITE_SOURCES="$SQFLITE_PATH/darwin/sqflite_darwin/Sources/sqflite_darwin"
+            
+            if [ -d "$SQFLITE_SOURCES" ]; then
+              echo "Patching sqflite_darwin source files"
+              
+              # Create a backup of original files
+              mkdir -p "$SQFLITE_SOURCES/backup"
+              cp "$SQFLITE_SOURCES/SqfliteDatabase.m" "$SQFLITE_SOURCES/backup/"
+              cp "$SQFLITE_SOURCES/SqflitePlugin.m" "$SQFLITE_SOURCES/backup/"
+              cp "$SQFLITE_SOURCES/SqfliteOperation.m" "$SQFLITE_SOURCES/backup/"
+              
+              # Create patch header file
+              cat > "$SQFLITE_SOURCES/sqflite_darwin_patch.h" << 'EOF'
+// sqflite_darwin_patch.h
+// This header defines necessary SQLite flags for sqflite_darwin
+
+#ifndef SQFLITE_DARWIN_PATCH_H
+#define SQFLITE_DARWIN_PATCH_H
+
+#define SQLITE_ENABLE_COLUMN_METADATA 1
+
+#endif /* SQFLITE_DARWIN_PATCH_H */
+EOF
+              
+              # Add SQLite column metadata preprocessor definition to all .m files
+              for file in "$SQFLITE_SOURCES/SqfliteDatabase.m" "$SQFLITE_SOURCES/SqflitePlugin.m" "$SQFLITE_SOURCES/SqfliteOperation.m"; do
+                echo "#define SQLITE_ENABLE_COLUMN_METADATA 1" > "$file.new"
+                echo "#import \"sqflite_darwin_patch.h\"" >> "$file.new"
+                cat "$file" >> "$file.new"
+                mv "$file.new" "$file"
+              done
+              
+              echo "Patched sqflite_darwin source files successfully"
+            else
+              echo "Could not find sqflite_darwin source directory at: $SQFLITE_SOURCES"
+            fi
+          else
+            echo "Could not find sqflite_darwin plugin"
+          fi
+
       - name: Set up iOS Firebase configuration
         script: |
           echo "Setting up iOS Firebase configuration"
