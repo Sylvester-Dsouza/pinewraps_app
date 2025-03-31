@@ -144,13 +144,25 @@ workflows:
           
       - name: Flutter build iOS
         script: |
-          cd "$FCI_BUILD_DIR"
+          cd "${FCI_BUILD_DIR}"
           
-          # Make the build script executable
-          chmod +x ios/build_ios.sh
+          # Skip flutter clean and pub get as they're already run in the prebuild script
+          echo "Building iOS app"
           
-          # Run the build script
-          ./ios/build_ios.sh
+          # Run the build_ios.sh script
+          chmod +x "${FCI_BUILD_DIR}/ios/build_ios.sh"
+          "${FCI_BUILD_DIR}/ios/build_ios.sh"
+          
+          # Create a directory for the IPA
+          mkdir -p build/ios/ipa
+          
+          # Export the archive to IPA
+          echo "Exporting archive to IPA"
+          xcodebuild -exportArchive \
+            -archivePath build/ios/archive/Runner.xcarchive \
+            -exportOptionsPlist ios/exportOptions.plist \
+            -exportPath build/ios/ipa/ \
+            -allowProvisioningUpdates
           
       - name: Create IPA
         script: |
@@ -400,13 +412,25 @@ workflows:
           
       - name: Flutter build iOS
         script: |
-          cd "$FCI_BUILD_DIR"
+          cd "${FCI_BUILD_DIR}"
           
-          # Make the build script executable
-          chmod +x ios/build_ios.sh
+          # Skip flutter clean and pub get as they're already run in the prebuild script
+          echo "Building iOS app"
           
-          # Run the build script
-          ./ios/build_ios.sh
+          # Run the build_ios.sh script
+          chmod +x "${FCI_BUILD_DIR}/ios/build_ios.sh"
+          "${FCI_BUILD_DIR}/ios/build_ios.sh"
+          
+          # Create a directory for the IPA
+          mkdir -p build/ios/ipa
+          
+          # Export the archive to IPA
+          echo "Exporting archive to IPA"
+          xcodebuild -exportArchive \
+            -archivePath build/ios/archive/Runner.xcarchive \
+            -exportOptionsPlist ios/exportOptions.plist \
+            -exportPath build/ios/ipa/ \
+            -allowProvisioningUpdates
           
       - name: Create iOS IPA
         script: |
