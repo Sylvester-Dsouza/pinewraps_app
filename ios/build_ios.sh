@@ -221,6 +221,10 @@ puts "Found #{privacy_targets.length} privacy bundle targets"
 
 privacy_targets.each do |target|
   puts "Configuring target: #{target.name}"
+  
+  # Remove all build phases
+  target.build_phases.clear
+  
   target.build_configurations.each do |config|
     config.build_settings["EXCLUDED_SOURCE_FILE_NAMES"] = "*"
     config.build_settings["SKIP_INSTALL"] = "YES"
@@ -231,6 +235,31 @@ privacy_targets.each do |target|
     config.build_settings["ENABLE_BITCODE"] = "NO"
     config.build_settings["WRAPPER_EXTENSION"] = "bundle"
     config.build_settings["MACH_O_TYPE"] = "mh_bundle"
+    config.build_settings["EXCLUDED_ARCHS"] = "arm64"
+    config.build_settings["ONLY_ACTIVE_ARCH"] = "NO"
+    config.build_settings["ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES"] = "NO"
+  end
+end
+
+# Remove privacy bundle references from all targets
+project.targets.each do |target|
+  next if target.name.end_with?("_privacy") || 
+          target.name.end_with?("-privacy") || 
+          target.name.end_with?("Privacy") || 
+          target.name.include?("privacy")
+  
+  target.build_phases.each do |phase|
+    if phase.respond_to?(:files)
+      phase.files.to_a.each do |build_file|
+        if build_file.display_name && (
+           build_file.display_name.end_with?("_privacy.bundle") || 
+           build_file.display_name.end_with?("-privacy.bundle") || 
+           build_file.display_name.end_with?("Privacy.bundle") || 
+           build_file.display_name.include?("privacy.bundle"))
+          phase.remove_build_file(build_file)
+        end
+      end
+    end
   end
 end
 
@@ -240,45 +269,95 @@ puts "Modified target configurations"
 
 # Method 3: Remove all privacy bundles from build phases
 echo "Removing privacy bundles from build phases"
-find Pods -name "*.xcconfig" -type f | xargs grep -l "privacy.bundle" | while read config_file; do
+find Pods -name "*.xcconfig" -type f | xargs grep -l "privacy.bundle\|Privacy.bundle" | while read config_file; do
   echo "Fixing config file: $config_file"
-  sed -i.bak 's/[^ ]*privacy[^ ]*\.bundle//g' "$config_file"
+  sed -i.bak 's/[^ ]*[pP]rivacy[^ ]*\.bundle//g' "$config_file"
 done
 
-# Method 4: Create empty Info.plist files for all privacy bundles
-echo "Creating Info.plist files for all privacy bundles"
-find Pods -name "*_privacy.bundle" -o -name "*-privacy.bundle" -o -name "*Privacy.bundle" -o -name "*.bundle" | grep -i privacy | while read bundle; do
-  if [ ! -f "$bundle/Info.plist" ]; then
-    echo "Creating Info.plist for $bundle"
-    mkdir -p "$bundle"
-    cat > "$bundle/Info.plist" << 'EOF'
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-	<key>CFBundleDevelopmentRegion</key>
-	<string>en</string>
-	<key>CFBundleIdentifier</key>
-	<string>org.cocoapods.privacy-bundle</string>
-	<key>CFBundleInfoDictionaryVersion</key>
-	<string>6.0</string>
-	<key>CFBundleName</key>
-	<string>privacy</string>
-	<key>CFBundlePackageType</key>
-	<string>BNDL</string>
-	<key>CFBundleShortVersionString</key>
-	<string>1.0.0</string>
-	<key>CFBundleSignature</key>
-	<string>????</string>
-	<key>CFBundleVersion</key>
-	<string>1</string>
-	<key>NSPrincipalClass</key>
-	<string></string>
-</dict>
-</plist>
-EOF
-  fi
+# Method 4: Modify the Runner.xcodeproj to exclude privacy bundles
+echo "Modifying Runner.xcodeproj to exclude privacy bundles"
+ruby -e '
+require "xcodeproj"
+project_path = "Runner.xcodeproj"
+project = Xcodeproj::Project.open(project_path)
+
+# Remove privacy bundle references from all targets
+project.targets.each do |target|
+  target.build_phases.each do |phase|
+    if phase.respond_to?(:files)
+      phase.files.to_a.each do |build_file|
+        if build_file.display_name && (
+           build_file.display_name.end_with?("_privacy.bundle") || 
+           build_file.display_name.end_with?("-privacy.bundle") || 
+           build_file.display_name.end_with?("Privacy.bundle") || 
+           build_file.display_name.include?("privacy.bundle"))
+          phase.remove_build_file(build_file)
+        end
+      end
+    end
+  end
+  
+  # Set build settings for the target
+  target.build_configurations.each do |config|
+    config.build_settings["EXCLUDED_SOURCE_FILE_NAMES"] = "*privacy.bundle *Privacy.bundle"
+    config.build_settings["ENABLE_BITCODE"] = "NO"
+    config.build_settings["IPHONEOS_DEPLOYMENT_TARGET"] = "12.0"
+  end
+end
+
+project.save
+puts "Modified Runner.xcodeproj"
+' || echo "Failed to modify Runner.xcodeproj"
+
+# Method 5: Create a custom script to remove privacy bundles during build
+echo "Creating a custom script to remove privacy bundles during build"
+cat > "remove_privacy_bundles.sh" << 'EOF'
+#!/bin/bash
+set -e
+
+echo "Running custom script to remove privacy bundles during build"
+
+# Find all privacy bundles in the build directory
+find "${BUILT_PRODUCTS_DIR}" -name "*_privacy.bundle" -o -name "*-privacy.bundle" -o -name "*Privacy.bundle" -o -name "*.bundle" | grep -i privacy | while read bundle; do
+  echo "Removing bundle from build products: $bundle"
+  rm -rf "$bundle"
 done
+
+echo "Privacy bundles removed successfully"
+EOF
+
+chmod +x "remove_privacy_bundles.sh"
+
+# Method 6: Add a custom build phase to Runner.xcodeproj
+echo "Adding a custom build phase to Runner.xcodeproj"
+ruby -e '
+require "xcodeproj"
+project_path = "Runner.xcodeproj"
+project = Xcodeproj::Project.open(project_path)
+
+# Add a custom build phase to the Runner target
+runner_target = project.targets.find { |t| t.name == "Runner" }
+if runner_target
+  # Check if we already have a custom build phase
+  has_custom_phase = runner_target.build_phases.any? { |phase| 
+    phase.respond_to?(:shell_script) && phase.shell_script.include?("remove_privacy_bundles.sh")
+  }
+  
+  unless has_custom_phase
+    # Add a new run script phase
+    phase = runner_target.new_shell_script_build_phase("Remove Privacy Bundles")
+    phase.shell_script = "${SRCROOT}/remove_privacy_bundles.sh"
+    
+    # Move it to be one of the last phases
+    runner_target.build_phases.move_from(runner_target.build_phases.index(phase), runner_target.build_phases.count - 2)
+  end
+  
+  project.save
+  puts "Added custom build phase to Runner.xcodeproj"
+else
+  puts "Runner target not found"
+end
+' || echo "Failed to add custom build phase"
 
 # Reinstall pods after modifications
 echo "Reinstalling pods after modifications"
