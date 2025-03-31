@@ -144,48 +144,13 @@ workflows:
           
       - name: Flutter build iOS
         script: |
-          # Set up local properties
-          echo "Setting up Flutter project"
           cd "$FCI_BUILD_DIR"
           
-          # Get Flutter dependencies
-          echo "Getting Flutter dependencies"
-          flutter pub get
+          # Make the build script executable
+          chmod +x ios/build_ios.sh
           
-          # Prepare iOS build environment
-          echo "Preparing iOS build environment"
-          cd ios
-          pod install
-          cd ..
-          
-          # Create a directory for the archive
-          mkdir -p "$FCI_BUILD_DIR/build/ios/archive"
-          
-          # Build and archive directly with xcodebuild
-          echo "Building and archiving iOS app with xcodebuild"
-          cd "$FCI_BUILD_DIR"
-          
-          # Use xcodebuild to build and archive in one step
-          xcodebuild clean archive \
-            -workspace ios/Runner.xcworkspace \
-            -scheme Runner \
-            -configuration Release \
-            -sdk iphoneos \
-            -archivePath "$FCI_BUILD_DIR/build/ios/archive/Runner.xcarchive" \
-            DEVELOPMENT_TEAM="4J9WXB52YV" \
-            CODE_SIGN_STYLE="Automatic" \
-            -allowProvisioningUpdates
-          
-          # Check if archive was created
-          if [ -d "$FCI_BUILD_DIR/build/ios/archive/Runner.xcarchive" ]; then
-            echo "Archive created successfully at $FCI_BUILD_DIR/build/ios/archive/Runner.xcarchive"
-            ls -la "$FCI_BUILD_DIR/build/ios/archive/Runner.xcarchive"
-          else
-            echo "Failed to create archive at $FCI_BUILD_DIR/build/ios/archive/Runner.xcarchive"
-            echo "Listing build directory contents:"
-            find "$FCI_BUILD_DIR/build" -type d | sort
-            exit 1
-          fi
+          # Run the build script
+          ./ios/build_ios.sh
           
       - name: Create IPA
         script: |
@@ -389,48 +354,13 @@ workflows:
           
       - name: Flutter build iOS
         script: |
-          # Set up local properties
-          echo "Setting up Flutter project"
           cd "$FCI_BUILD_DIR"
           
-          # Get Flutter dependencies
-          echo "Getting Flutter dependencies"
-          flutter pub get
+          # Make the build script executable
+          chmod +x ios/build_ios.sh
           
-          # Prepare iOS build environment
-          echo "Preparing iOS build environment"
-          cd ios
-          pod install
-          cd ..
-          
-          # Create a directory for the archive
-          mkdir -p "$FCI_BUILD_DIR/build/ios/archive"
-          
-          # Build and archive directly with xcodebuild
-          echo "Building and archiving iOS app with xcodebuild"
-          cd "$FCI_BUILD_DIR"
-          
-          # Use xcodebuild to build and archive in one step
-          xcodebuild clean archive \
-            -workspace ios/Runner.xcworkspace \
-            -scheme Runner \
-            -configuration Release \
-            -sdk iphoneos \
-            -archivePath "$FCI_BUILD_DIR/build/ios/archive/Runner.xcarchive" \
-            DEVELOPMENT_TEAM="4J9WXB52YV" \
-            CODE_SIGN_STYLE="Automatic" \
-            -allowProvisioningUpdates
-          
-          # Check if archive was created
-          if [ -d "$FCI_BUILD_DIR/build/ios/archive/Runner.xcarchive" ]; then
-            echo "Archive created successfully at $FCI_BUILD_DIR/build/ios/archive/Runner.xcarchive"
-            ls -la "$FCI_BUILD_DIR/build/ios/archive/Runner.xcarchive"
-          else
-            echo "Failed to create archive at $FCI_BUILD_DIR/build/ios/archive/Runner.xcarchive"
-            echo "Listing build directory contents:"
-            find "$FCI_BUILD_DIR/build" -type d | sort
-            exit 1
-          fi
+          # Run the build script
+          ./ios/build_ios.sh
           
       - name: Create iOS IPA
         script: |
