@@ -160,11 +160,17 @@ workflows:
           
           # Export the archive to IPA
           echo "Exporting archive to IPA"
-          xcodebuild -exportArchive \
-            -archivePath build/ios/archive/Runner.xcarchive \
-            -exportOptionsPlist ios/exportOptions.plist \
-            -exportPath build/ios/ipa/ \
-            -allowProvisioningUpdates
+          # Only attempt to export if the archive exists
+          if [ -d "build/ios/archive/Runner.xcarchive" ]; then
+            xcodebuild -exportArchive \
+              -archivePath build/ios/archive/Runner.xcarchive \
+              -exportOptionsPlist ios/exportOptions.plist \
+              -exportPath build/ios/ipa/ \
+              -allowProvisioningUpdates
+          else
+            echo "Archive not found, skipping export"
+            exit 1
+          fi
           
       - name: Create IPA
         script: |
@@ -430,11 +436,17 @@ workflows:
           
           # Export the archive to IPA
           echo "Exporting archive to IPA"
-          xcodebuild -exportArchive \
-            -archivePath build/ios/archive/Runner.xcarchive \
-            -exportOptionsPlist ios/exportOptions.plist \
-            -exportPath build/ios/ipa/ \
-            -allowProvisioningUpdates
+          # Only attempt to export if the archive exists
+          if [ -d "build/ios/archive/Runner.xcarchive" ]; then
+            xcodebuild -exportArchive \
+              -archivePath build/ios/archive/Runner.xcarchive \
+              -exportOptionsPlist ios/exportOptions.plist \
+              -exportPath build/ios/ipa/ \
+              -allowProvisioningUpdates
+          else
+            echo "Archive not found, skipping export"
+            exit 1
+          fi
           
       - name: Create iOS IPA
         script: |

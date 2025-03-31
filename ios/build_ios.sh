@@ -146,6 +146,10 @@ rm -f Podfile.lock
 echo "Installing Pods"
 pod install --repo-update
 
+# Check Swift version
+echo "Swift version:"
+xcrun swift --version
+
 # Return to project root
 cd ..
 
@@ -167,6 +171,7 @@ xcodebuild clean archive \
   COMPILER_INDEX_STORE_ENABLE=NO \
   OTHER_CFLAGS="-DSQLITE_ENABLE_COLUMN_METADATA" \
   GCC_PREPROCESSOR_DEFINITIONS="SQLITE_ENABLE_COLUMN_METADATA=1 \$(inherited)" \
+  SWIFT_VERSION=5.0 \
   -allowProvisioningUpdates
 
 # Check if archive was created

@@ -47,7 +47,12 @@ import FirebaseMessaging
   func userNotificationCenter(_ center: UNUserNotificationCenter,
                               willPresent notification: UNNotification,
                               withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
-    completionHandler([[.alert, .sound, .badge]])
+    // Fix the UNNotificationPresentationOptions syntax
+    if #available(iOS 14.0, *) {
+      completionHandler([.alert, .sound, .badge, .list, .banner])
+    } else {
+      completionHandler([.alert, .sound, .badge])
+    }
   }
 
   func userNotificationCenter(_ center: UNUserNotificationCenter,
