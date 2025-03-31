@@ -14,8 +14,6 @@ workflows:
         APP_STORE_CONNECT_ISSUER_ID: ${APP_STORE_CONNECT_ISSUER_ID}
         APP_STORE_CONNECT_KEY_IDENTIFIER: ${APP_STORE_CONNECT_KEY_IDENTIFIER}
         APP_STORE_CONNECT_PRIVATE_KEY: ${APP_STORE_CONNECT_PRIVATE_KEY}
-        CERTIFICATE_PRIVATE_KEY: ${CERTIFICATE_PRIVATE_KEY}
-        CERTIFICATE_PASSWORD: ${CERTIFICATE_PASSWORD}
     scripts:
       - name: Set up code signing
         script: |
@@ -23,169 +21,31 @@ workflows:
           # Initialize keychain
           keychain initialize
           
-          # Try App Store Connect API first
+          # Use App Store Connect API for code signing with CERT_DISTRIBUTION
           if [ -n "$APP_STORE_CONNECT_ISSUER_ID" ] && [ -n "$APP_STORE_CONNECT_KEY_IDENTIFIER" ] && [ -n "$APP_STORE_CONNECT_PRIVATE_KEY" ]; then
-            echo "Trying App Store Connect API for code signing"
+            echo "Using App Store Connect API for code signing"
             
             # First, create the app in App Store Connect if it doesn't exist
             app-store-connect create-app "$IOS_BUNDLE_ID" "Pinewraps" --skip-if-exists || true
             
-            # Try to fetch or create the signing files
-            echo "Attempting to fetch or create signing files..."
-            app-store-connect fetch-signing-files "$IOS_BUNDLE_ID" --type IOS_APP_STORE --create
+            # Use CERT_DISTRIBUTION with fetch-signing-files
+            echo "Fetching or creating signing files with CERT_DISTRIBUTION..."
+            app-store-connect fetch-signing-files "$IOS_BUNDLE_ID" \
+              --type IOS_APP_STORE \
+              --create \
+              --certificate CERT_DISTRIBUTION
             
             # Check if the profile was created successfully
             if [ $? -eq 0 ]; then
-              echo "Successfully set up code signing with App Store Connect API"
+              echo "Successfully set up code signing with App Store Connect API and CERT_DISTRIBUTION"
             else
-              echo "App Store Connect API method failed. Trying manual certificate method..."
-              
-              # Fall back to manual certificate method
-              if [ -n "$CERTIFICATE_PRIVATE_KEY" ] && [ -n "$CERTIFICATE_PASSWORD" ]; then
-                echo "Using manual certificate for code signing"
-                # Create a temporary directory for the certificate
-                CERTIFICATE_PATH=$(mktemp -d)
-                echo "$CERTIFICATE_PRIVATE_KEY" | base64 --decode > "$CERTIFICATE_PATH/certificate.p12"
-                
-                # Import the certificate to keychain
-                keychain add-certificates \
-                  --certificate "$CERTIFICATE_PATH/certificate.p12" \
-                  --certificate-password "$CERTIFICATE_PASSWORD"
-                
-                # Use the certificate for code signing
-                echo "Setting up code signing identity and provisioning profiles"
-                PROFILES_PATH="$HOME/Library/MobileDevice/Provisioning Profiles"
-                mkdir -p "$PROFILES_PATH"
-                
-                # Create a development provisioning profile
-                echo "Creating a development provisioning profile"
-                DEVELOPMENT_PROFILE_PATH="$PROFILES_PATH/development.mobileprovision"
-                cat > "$DEVELOPMENT_PROFILE_PATH" << EOF
-                <?xml version="1.0" encoding="UTF-8"?>
-                <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-                <plist version="1.0">
-                <dict>
-                    <key>AppIDName</key>
-                    <string>Pinewraps</string>
-                    <key>ApplicationIdentifierPrefix</key>
-                    <array>
-                        <string>*</string>
-                    </array>
-                    <key>CreationDate</key>
-                    <date>2023-01-01T00:00:00Z</date>
-                    <key>Platform</key>
-                    <array>
-                        <string>iOS</string>
-                    </array>
-                    <key>DeveloperCertificates</key>
-                    <array>
-                    </array>
-                    <key>Entitlements</key>
-                    <dict>
-                        <key>application-identifier</key>
-                        <string>com.pinewraps.app</string>
-                        <key>get-task-allow</key>
-                        <true/>
-                    </dict>
-                    <key>ExpirationDate</key>
-                    <date>2030-01-01T00:00:00Z</date>
-                    <key>Name</key>
-                    <string>Pinewraps Development</string>
-                    <key>TeamIdentifier</key>
-                    <array>
-                        <string>XXXXXXXXXX</string>
-                    </array>
-                    <key>TimeToLive</key>
-                    <integer>365</integer>
-                    <key>UUID</key>
-                    <string>00000000-0000-0000-0000-000000000000</string>
-                    <key>Version</key>
-                    <integer>1</integer>
-                </dict>
-                </plist>
-                EOF
-                
-                echo "Manual code signing set up successfully"
-              else
-                echo "Error: Neither App Store Connect API nor manual certificate method can be used."
-                echo "Please set up either App Store Connect API credentials or a manual certificate."
-                exit 1
-              fi
-            fi
-          else
-            echo "App Store Connect API credentials not found. Trying manual certificate method..."
-            
-            # Fall back to manual certificate method
-            if [ -n "$CERTIFICATE_PRIVATE_KEY" ] && [ -n "$CERTIFICATE_PASSWORD" ]; then
-              echo "Using manual certificate for code signing"
-              # Create a temporary directory for the certificate
-              CERTIFICATE_PATH=$(mktemp -d)
-              echo "$CERTIFICATE_PRIVATE_KEY" | base64 --decode > "$CERTIFICATE_PATH/certificate.p12"
-              
-              # Import the certificate to keychain
-              keychain add-certificates \
-                --certificate "$CERTIFICATE_PATH/certificate.p12" \
-                --certificate-password "$CERTIFICATE_PASSWORD"
-              
-              # Use the certificate for code signing
-              echo "Setting up code signing identity and provisioning profiles"
-              PROFILES_PATH="$HOME/Library/MobileDevice/Provisioning Profiles"
-              mkdir -p "$PROFILES_PATH"
-              
-              # Create a development provisioning profile
-              echo "Creating a development provisioning profile"
-              DEVELOPMENT_PROFILE_PATH="$PROFILES_PATH/development.mobileprovision"
-              cat > "$DEVELOPMENT_PROFILE_PATH" << EOF
-              <?xml version="1.0" encoding="UTF-8"?>
-              <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-              <plist version="1.0">
-              <dict>
-                  <key>AppIDName</key>
-                  <string>Pinewraps</string>
-                  <key>ApplicationIdentifierPrefix</key>
-                  <array>
-                      <string>*</string>
-                  </array>
-                  <key>CreationDate</key>
-                  <date>2023-01-01T00:00:00Z</date>
-                  <key>Platform</key>
-                  <array>
-                      <string>iOS</string>
-                  </array>
-                  <key>DeveloperCertificates</key>
-                  <array>
-                  </array>
-                  <key>Entitlements</key>
-                  <dict>
-                      <key>application-identifier</key>
-                      <string>com.pinewraps.app</string>
-                      <key>get-task-allow</key>
-                      <true/>
-                  </dict>
-                  <key>ExpirationDate</key>
-                  <date>2030-01-01T00:00:00Z</date>
-                  <key>Name</key>
-                  <string>Pinewraps Development</string>
-                  <key>TeamIdentifier</key>
-                  <array>
-                      <string>XXXXXXXXXX</string>
-                  </array>
-                  <key>TimeToLive</key>
-                  <integer>365</integer>
-                  <key>UUID</key>
-                  <string>00000000-0000-0000-0000-000000000000</string>
-                  <key>Version</key>
-                  <integer>1</integer>
-              </dict>
-              </plist>
-              EOF
-              
-              echo "Manual code signing set up successfully"
-            else
-              echo "Error: Neither App Store Connect API nor manual certificate method can be used."
-              echo "Please set up either App Store Connect API credentials or a manual certificate."
+              echo "Failed to fetch or create provisioning profile. Please check your App Store Connect API credentials."
+              echo "Make sure your Apple Developer account has the necessary permissions."
               exit 1
             fi
+          else
+            echo "Error: App Store Connect API credentials not found. Cannot proceed with code signing."
+            exit 1
           fi
           
       - name: Set up Firebase configuration
@@ -332,8 +192,6 @@ workflows:
         APP_STORE_CONNECT_ISSUER_ID: ${APP_STORE_CONNECT_ISSUER_ID}
         APP_STORE_CONNECT_KEY_IDENTIFIER: ${APP_STORE_CONNECT_KEY_IDENTIFIER}
         APP_STORE_CONNECT_PRIVATE_KEY: ${APP_STORE_CONNECT_PRIVATE_KEY}
-        CERTIFICATE_PRIVATE_KEY: ${CERTIFICATE_PRIVATE_KEY}
-        CERTIFICATE_PASSWORD: ${CERTIFICATE_PASSWORD}
     triggering:
       events:
         - push
@@ -348,169 +206,31 @@ workflows:
           # Initialize keychain
           keychain initialize
           
-          # Try App Store Connect API first
+          # Use App Store Connect API for code signing with CERT_DISTRIBUTION
           if [ -n "$APP_STORE_CONNECT_ISSUER_ID" ] && [ -n "$APP_STORE_CONNECT_KEY_IDENTIFIER" ] && [ -n "$APP_STORE_CONNECT_PRIVATE_KEY" ]; then
-            echo "Trying App Store Connect API for code signing"
+            echo "Using App Store Connect API for code signing"
             
             # First, create the app in App Store Connect if it doesn't exist
             app-store-connect create-app "$IOS_BUNDLE_ID" "Pinewraps" --skip-if-exists || true
             
-            # Try to fetch or create the signing files
-            echo "Attempting to fetch or create signing files..."
-            app-store-connect fetch-signing-files "$IOS_BUNDLE_ID" --type IOS_APP_STORE --create
+            # Use CERT_DISTRIBUTION with fetch-signing-files
+            echo "Fetching or creating signing files with CERT_DISTRIBUTION..."
+            app-store-connect fetch-signing-files "$IOS_BUNDLE_ID" \
+              --type IOS_APP_STORE \
+              --create \
+              --certificate CERT_DISTRIBUTION
             
             # Check if the profile was created successfully
             if [ $? -eq 0 ]; then
-              echo "Successfully set up code signing with App Store Connect API"
+              echo "Successfully set up code signing with App Store Connect API and CERT_DISTRIBUTION"
             else
-              echo "App Store Connect API method failed. Trying manual certificate method..."
-              
-              # Fall back to manual certificate method
-              if [ -n "$CERTIFICATE_PRIVATE_KEY" ] && [ -n "$CERTIFICATE_PASSWORD" ]; then
-                echo "Using manual certificate for code signing"
-                # Create a temporary directory for the certificate
-                CERTIFICATE_PATH=$(mktemp -d)
-                echo "$CERTIFICATE_PRIVATE_KEY" | base64 --decode > "$CERTIFICATE_PATH/certificate.p12"
-                
-                # Import the certificate to keychain
-                keychain add-certificates \
-                  --certificate "$CERTIFICATE_PATH/certificate.p12" \
-                  --certificate-password "$CERTIFICATE_PASSWORD"
-                
-                # Use the certificate for code signing
-                echo "Setting up code signing identity and provisioning profiles"
-                PROFILES_PATH="$HOME/Library/MobileDevice/Provisioning Profiles"
-                mkdir -p "$PROFILES_PATH"
-                
-                # Create a development provisioning profile
-                echo "Creating a development provisioning profile"
-                DEVELOPMENT_PROFILE_PATH="$PROFILES_PATH/development.mobileprovision"
-                cat > "$DEVELOPMENT_PROFILE_PATH" << EOF
-                <?xml version="1.0" encoding="UTF-8"?>
-                <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-                <plist version="1.0">
-                <dict>
-                    <key>AppIDName</key>
-                    <string>Pinewraps</string>
-                    <key>ApplicationIdentifierPrefix</key>
-                    <array>
-                        <string>*</string>
-                    </array>
-                    <key>CreationDate</key>
-                    <date>2023-01-01T00:00:00Z</date>
-                    <key>Platform</key>
-                    <array>
-                        <string>iOS</string>
-                    </array>
-                    <key>DeveloperCertificates</key>
-                    <array>
-                    </array>
-                    <key>Entitlements</key>
-                    <dict>
-                        <key>application-identifier</key>
-                        <string>com.pinewraps.app</string>
-                        <key>get-task-allow</key>
-                        <true/>
-                    </dict>
-                    <key>ExpirationDate</key>
-                    <date>2030-01-01T00:00:00Z</date>
-                    <key>Name</key>
-                    <string>Pinewraps Development</string>
-                    <key>TeamIdentifier</key>
-                    <array>
-                        <string>XXXXXXXXXX</string>
-                    </array>
-                    <key>TimeToLive</key>
-                    <integer>365</integer>
-                    <key>UUID</key>
-                    <string>00000000-0000-0000-0000-000000000000</string>
-                    <key>Version</key>
-                    <integer>1</integer>
-                </dict>
-                </plist>
-                EOF
-                
-                echo "Manual code signing set up successfully"
-              else
-                echo "Error: Neither App Store Connect API nor manual certificate method can be used."
-                echo "Please set up either App Store Connect API credentials or a manual certificate."
-                exit 1
-              fi
-            fi
-          else
-            echo "App Store Connect API credentials not found. Trying manual certificate method..."
-            
-            # Fall back to manual certificate method
-            if [ -n "$CERTIFICATE_PRIVATE_KEY" ] && [ -n "$CERTIFICATE_PASSWORD" ]; then
-              echo "Using manual certificate for code signing"
-              # Create a temporary directory for the certificate
-              CERTIFICATE_PATH=$(mktemp -d)
-              echo "$CERTIFICATE_PRIVATE_KEY" | base64 --decode > "$CERTIFICATE_PATH/certificate.p12"
-              
-              # Import the certificate to keychain
-              keychain add-certificates \
-                --certificate "$CERTIFICATE_PATH/certificate.p12" \
-                --certificate-password "$CERTIFICATE_PASSWORD"
-              
-              # Use the certificate for code signing
-              echo "Setting up code signing identity and provisioning profiles"
-              PROFILES_PATH="$HOME/Library/MobileDevice/Provisioning Profiles"
-              mkdir -p "$PROFILES_PATH"
-              
-              # Create a development provisioning profile
-              echo "Creating a development provisioning profile"
-              DEVELOPMENT_PROFILE_PATH="$PROFILES_PATH/development.mobileprovision"
-              cat > "$DEVELOPMENT_PROFILE_PATH" << EOF
-              <?xml version="1.0" encoding="UTF-8"?>
-              <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-              <plist version="1.0">
-              <dict>
-                  <key>AppIDName</key>
-                  <string>Pinewraps</string>
-                  <key>ApplicationIdentifierPrefix</key>
-                  <array>
-                      <string>*</string>
-                  </array>
-                  <key>CreationDate</key>
-                  <date>2023-01-01T00:00:00Z</date>
-                  <key>Platform</key>
-                  <array>
-                      <string>iOS</string>
-                  </array>
-                  <key>DeveloperCertificates</key>
-                  <array>
-                  </array>
-                  <key>Entitlements</key>
-                  <dict>
-                      <key>application-identifier</key>
-                      <string>com.pinewraps.app</string>
-                      <key>get-task-allow</key>
-                      <true/>
-                  </dict>
-                  <key>ExpirationDate</key>
-                  <date>2030-01-01T00:00:00Z</date>
-                  <key>Name</key>
-                  <string>Pinewraps Development</string>
-                  <key>TeamIdentifier</key>
-                  <array>
-                      <string>XXXXXXXXXX</string>
-                  </array>
-                  <key>TimeToLive</key>
-                  <integer>365</integer>
-                  <key>UUID</key>
-                  <string>00000000-0000-0000-0000-000000000000</string>
-                  <key>Version</key>
-                  <integer>1</integer>
-              </dict>
-              </plist>
-              EOF
-              
-              echo "Manual code signing set up successfully"
-            else
-              echo "Error: Neither App Store Connect API nor manual certificate method can be used."
-              echo "Please set up either App Store Connect API credentials or a manual certificate."
+              echo "Failed to fetch or create provisioning profile. Please check your App Store Connect API credentials."
+              echo "Make sure your Apple Developer account has the necessary permissions."
               exit 1
             fi
+          else
+            echo "Error: App Store Connect API credentials not found. Cannot proceed with code signing."
+            exit 1
           fi
           
       - name: Set up iOS Firebase configuration
