@@ -128,7 +128,7 @@ workflows:
         script: |
           # Set up local properties
           echo "Setting up Flutter project"
-          cd pinewraps_app
+          cd "$FCI_BUILD_DIR"
           
           # Explicitly set development team in project settings
           echo "Setting development team in project settings"
@@ -145,21 +145,41 @@ workflows:
           echo "Building iOS app"
           flutter build ios --release --no-codesign
           
+          # Create build directory if it doesn't exist
+          mkdir -p build/ios/archive
+          
           # Archive the app
           echo "Archiving iOS app"
-          xcodebuild -workspace ios/Runner.xcworkspace -scheme Runner -configuration Release -archivePath build/ios/Runner.xcarchive archive
+          xcodebuild -workspace ios/Runner.xcworkspace \
+            -scheme Runner \
+            -configuration Release \
+            -sdk iphoneos \
+            -archivePath build/ios/archive/Runner.xcarchive \
+            archive
           
           # Export the app
           echo "Exporting iOS app"
-          xcodebuild -exportArchive -archivePath build/ios/Runner.xcarchive -exportOptionsPlist ios/ExportOptions.plist -exportPath build/ios/ipa
+          xcodebuild -exportArchive \
+            -archivePath build/ios/archive/Runner.xcarchive \
+            -exportOptionsPlist ios/exportOptions.plist \
+            -exportPath build/ios/ipa
           
-          cd ..
-
       - name: Create IPA
         script: |
-          cd "${FCI_BUILD_DIR}/ios"
-          xcodebuild -workspace Runner.xcworkspace -scheme Runner -configuration Release -archivePath build/Runner.xcarchive archive
-          xcodebuild -exportArchive -archivePath build/Runner.xcarchive -exportOptionsPlist exportOptions.plist -exportPath build/ios/ipa
+          cd "$FCI_BUILD_DIR"
+          # Check if the archive exists
+          if [ -d "build/ios/archive/Runner.xcarchive" ]; then
+            echo "Archive exists, proceeding with export"
+            xcodebuild -exportArchive \
+              -archivePath build/ios/archive/Runner.xcarchive \
+              -exportOptionsPlist ios/exportOptions.plist \
+              -exportPath build/ios/ipa
+          else
+            echo "Archive not found at path build/ios/archive/Runner.xcarchive"
+            echo "Listing contents of build directory:"
+            find build -type d | sort
+            exit 1
+          fi
     artifacts:
       - build/ios/ipa/*.ipa
       - build/ios/xcarchive/*.xcarchive
@@ -364,7 +384,7 @@ workflows:
         script: |
           # Set up local properties
           echo "Setting up Flutter project"
-          cd pinewraps_app
+          cd "$FCI_BUILD_DIR"
           
           # Explicitly set development team in project settings
           echo "Setting development team in project settings"
@@ -381,21 +401,41 @@ workflows:
           echo "Building iOS app"
           flutter build ios --release --no-codesign
           
+          # Create build directory if it doesn't exist
+          mkdir -p build/ios/archive
+          
           # Archive the app
           echo "Archiving iOS app"
-          xcodebuild -workspace ios/Runner.xcworkspace -scheme Runner -configuration Release -archivePath build/ios/Runner.xcarchive archive
+          xcodebuild -workspace ios/Runner.xcworkspace \
+            -scheme Runner \
+            -configuration Release \
+            -sdk iphoneos \
+            -archivePath build/ios/archive/Runner.xcarchive \
+            archive
           
           # Export the app
           echo "Exporting iOS app"
-          xcodebuild -exportArchive -archivePath build/ios/Runner.xcarchive -exportOptionsPlist ios/ExportOptions.plist -exportPath build/ios/ipa
-          
-          cd ..
+          xcodebuild -exportArchive \
+            -archivePath build/ios/archive/Runner.xcarchive \
+            -exportOptionsPlist ios/exportOptions.plist \
+            -exportPath build/ios/ipa
           
       - name: Create iOS IPA
         script: |
-          cd "${FCI_BUILD_DIR}/ios"
-          xcodebuild -workspace Runner.xcworkspace -scheme Runner -configuration Release -archivePath build/Runner.xcarchive archive
-          xcodebuild -exportArchive -archivePath build/Runner.xcarchive -exportOptionsPlist exportOptions.plist -exportPath build/ios/ipa
+          cd "$FCI_BUILD_DIR"
+          # Check if the archive exists
+          if [ -d "build/ios/archive/Runner.xcarchive" ]; then
+            echo "Archive exists, proceeding with export"
+            xcodebuild -exportArchive \
+              -archivePath build/ios/archive/Runner.xcarchive \
+              -exportOptionsPlist ios/exportOptions.plist \
+              -exportPath build/ios/ipa
+          else
+            echo "Archive not found at path build/ios/archive/Runner.xcarchive"
+            echo "Listing contents of build directory:"
+            find build -type d | sort
+            exit 1
+          fi
           
       # Android setup and build
       - name: Set up Android keystore
