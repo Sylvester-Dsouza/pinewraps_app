@@ -2,11 +2,29 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-    <key>method</key>
-    <string>app-store</string>
-    <key>teamID</key>
-    <string>4J9WXB52YV</string>
-    <key>signingStyle</key>
-    <string>automatic</string>
+	<key>method</key>
+	<string>app-store</string>
+	<key>provisioningProfiles</key>
+	<dict>
+		<key>com.pinewraps.app</key>
+		<string>match AppStore com.pinewraps.app</string>
+	</dict>
+	<key>signingCertificate</key>
+	<string>Apple Distribution</string>
+	<key>signingStyle</key>
+	<string>manual</string>
+	<key>teamID</key>
+	<string>$(DEVELOPMENT_TEAM)</string>
+	<key>compileBitcode</key>
+	<false/>
+	<key>stripSwiftSymbols</key>
+	<true/>
+	<key>thinning</key>
+	<string>&lt;none&gt;</string>
+	<key>manifest</key>
+	<dict>
+		<key>appURL</key>
+		<string>https://pinewraps.com</string>
+	</dict>
 </dict>
 </plist>

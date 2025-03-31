@@ -26,12 +26,19 @@ require File.expand_path(File.join('packages', 'flutter_tools', 'bin', 'podhelpe
 
 flutter_ios_podfile_setup
 
-# Prevent Pods from embedding Swift libraries
+# Remove privacy bundles from being built
 pre_install do |installer|
+  # Exclude privacy bundles from being built
   installer.pod_targets.each do |pod|
     if pod.name.end_with?('_privacy') || pod.name.end_with?('-privacy') || pod.name.end_with?('Privacy')
+      def pod.should_build?
+        false
+      end
       def pod.build_type;
         Pod::BuildType.static_library
+      end
+      def pod.should_copy_resources?
+        false
       end
     end
   end
@@ -51,16 +58,10 @@ target 'Runner' do
   pod 'GoogleDataTransport', :modular_headers => true
   
   post_install do |installer|
+    # Remove privacy bundles from project
     installer.pods_project.targets.each do |target|
-      target.build_configurations.each do |config|
-        # Set deployment target for all pods
-        config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '12.0'
-        config.build_settings['ENABLE_BITCODE'] = 'NO'
-        config.build_settings['SWIFT_VERSION'] = '5.0'
-        
-        # Handle privacy bundles
-        if target.name.end_with?('_privacy') || target.name.end_with?('-privacy') || target.name.end_with?('Privacy')
-          target.build_phases.clear
+      if target.name.end_with?('_privacy') || target.name.end_with?('-privacy') || target.name.end_with?('Privacy')
+        target.build_configurations.each do |config|
           config.build_settings['SWIFT_VERSION'] = nil
           config.build_settings['MACH_O_TYPE'] = 'mh_bundle'
           config.build_settings['SKIP_INSTALL'] = 'YES'
@@ -69,7 +70,22 @@ target 'Runner' do
           config.build_settings['CODE_SIGN_IDENTITY'] = ''
           config.build_settings['EMBEDDED_CONTENT_CONTAINS_SWIFT'] = 'NO'
           config.build_settings['ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES'] = 'NO'
+          config.build_settings['COPY_PHASE_STRIP'] = 'YES'
+          config.build_settings['STRIP_INSTALLED_PRODUCT'] = 'YES'
         end
+        
+        # Remove all build phases
+        target.build_phases.clear
+      end
+    end
+
+    installer.pods_project.targets.each do |target|
+      target.build_configurations.each do |config|
+        # Set deployment target for all pods
+        config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '12.0'
+        config.build_settings['ENABLE_BITCODE'] = 'NO'
+        config.build_settings['SWIFT_VERSION'] = '5.0'
+        config.build_settings['EXCLUDED_SOURCE_FILE_NAMES'] = ['*_privacy.bundle', '*-privacy.bundle', '*Privacy.bundle']
       end
     end
     

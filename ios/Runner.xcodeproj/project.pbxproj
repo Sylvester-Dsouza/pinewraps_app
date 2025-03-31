@@ -380,6 +380,11 @@
 					"\"${PODS_ROOT}/Headers/Public\"",
 					"\"${PODS_ROOT}/Headers/Public/Flutter\"",
 				);
+				EXCLUDED_SOURCE_FILE_NAMES = (
+					"*_privacy.bundle",
+					"*-privacy.bundle",
+					"*Privacy.bundle",
+				);
 			};
 			name = Profile;
 		};
@@ -484,6 +489,11 @@
 				ONLY_ACTIVE_ARCH = YES;
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
+				EXCLUDED_SOURCE_FILE_NAMES = (
+					"*_privacy.bundle",
+					"*-privacy.bundle",
+					"*Privacy.bundle",
+				);
 			};
 			name = Debug;
 		};
@@ -538,6 +548,11 @@
 				SWIFT_OPTIMIZATION_LEVEL = "-O";
 				TARGETED_DEVICE_FAMILY = "1,2";
 				VALIDATE_PRODUCT = YES;
+				EXCLUDED_SOURCE_FILE_NAMES = (
+					"*_privacy.bundle",
+					"*-privacy.bundle",
+					"*Privacy.bundle",
+				);
 			};
 			name = Release;
 		};
@@ -545,27 +560,49 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 9740EEB21CF90195004384FC /* Debug.xcconfig */;
 			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_ENTITLEMENTS = Runner/Runner.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				DEVELOPMENT_TEAM = 4J9WXB52YV;
+				DEVELOPMENT_TEAM = "${DEVELOPMENT_TEAM}";
 				CURRENT_PROJECT_VERSION = "$(FLUTTER_BUILD_NUMBER)";
 				ENABLE_BITCODE = NO;
 				INFOPLIST_FILE = Runner/Info.plist;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.shopping";
+				INFOPLIST_KEY_NSCameraUsageDescription = "This app needs camera access to scan QR codes and take photos for uploads";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "This app needs access to location when open to provide location-based notifications";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "This app needs microphone access for voice input in web content";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "This app needs access to photo library for uploading images";
+				IPHONEOS_DEPLOYMENT_TARGET = 12.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.pinewraps.app;
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-framework",
+					"Flutter",
+					"-ObjC",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "com.pinewraps.app";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_OBJC_BRIDGING_HEADER = "Runner/Runner-Bridging-Header.h";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.0;
 				VERSIONING_SYSTEM = "apple-generic";
-				HEADER_SEARCH_PATHS = (
+				EXCLUDED_SOURCE_FILE_NAMES = (
+					"*_privacy.bundle",
+					"*-privacy.bundle",
+					"*Privacy.bundle",
+				);
+				SKIP_INSTALL = NO;
+				GCC_PREPROCESSOR_DEFINITIONS = (
 					"$(inherited)",
-					"\"${PODS_ROOT}/Headers/Public\"",
-					"\"${PODS_ROOT}/Headers/Public/Flutter\"",
+					"PERMISSION_CAMERA=1",
+					"PERMISSION_PHOTOS=1",
+					"PERMISSION_LOCATION=1",
+					"PERMISSION_MICROPHONE=1",
 				);
 			};
 			name = Debug;
@@ -574,26 +611,48 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 7AFA3C8E1D35360C0083082E /* Release.xcconfig */;
 			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_ENTITLEMENTS = Runner/Runner.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				DEVELOPMENT_TEAM = 4J9WXB52YV;
+				DEVELOPMENT_TEAM = "${DEVELOPMENT_TEAM}";
 				CURRENT_PROJECT_VERSION = "$(FLUTTER_BUILD_NUMBER)";
 				ENABLE_BITCODE = NO;
 				INFOPLIST_FILE = Runner/Info.plist;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.shopping";
+				INFOPLIST_KEY_NSCameraUsageDescription = "This app needs camera access to scan QR codes and take photos for uploads";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "This app needs access to location when open to provide location-based notifications";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "This app needs microphone access for voice input in web content";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "This app needs access to photo library for uploading images";
+				IPHONEOS_DEPLOYMENT_TARGET = 12.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.pinewraps.app;
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-framework",
+					"Flutter",
+					"-ObjC",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "com.pinewraps.app";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_OBJC_BRIDGING_HEADER = "Runner/Runner-Bridging-Header.h";
 				SWIFT_VERSION = 5.0;
 				VERSIONING_SYSTEM = "apple-generic";
-				HEADER_SEARCH_PATHS = (
+				EXCLUDED_SOURCE_FILE_NAMES = (
+					"*_privacy.bundle",
+					"*-privacy.bundle",
+					"*Privacy.bundle",
+				);
+				SKIP_INSTALL = NO;
+				GCC_PREPROCESSOR_DEFINITIONS = (
 					"$(inherited)",
-					"\"${PODS_ROOT}/Headers/Public\"",
-					"\"${PODS_ROOT}/Headers/Public/Flutter\"",
+					"PERMISSION_CAMERA=1",
+					"PERMISSION_PHOTOS=1",
+					"PERMISSION_LOCATION=1",
+					"PERMISSION_MICROPHONE=1",
 				);
 			};
 			name = Release;

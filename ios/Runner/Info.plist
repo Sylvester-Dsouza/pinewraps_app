@@ -42,6 +42,8 @@
 	<string>1234567890-abcdefghijklmnopqrstuvwxyz.apps.googleusercontent.com</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>UIApplicationSupportsIndirectInputEvents</key>
+	<true/>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>fetch</string>
@@ -66,20 +68,49 @@
 	</array>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
-	<key>UIApplicationSupportsIndirectInputEvents</key>
-	<true/>
-	<!-- Privacy permissions -->
+	
+	<!-- Privacy descriptions -->
+	<!-- For webview_flutter_wkwebview -->
 	<key>NSCameraUsageDescription</key>
-	<string>This app needs camera access to scan QR codes</string>
-	<key>NSPhotoLibraryUsageDescription</key>
-	<string>This app needs photo library access to upload images</string>
-	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>This app needs location access for store locator features</string>
-	<!-- App Transport Security Settings -->
+	<string>This app needs camera access to scan QR codes and take photos for uploads</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>This app needs microphone access for voice input in web content</string>
+	
+	<!-- For url_launcher -->
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>https</string>
+		<string>http</string>
+		<string>tel</string>
+		<string>mailto</string>
+		<string>whatsapp</string>
+	</array>
+	
+	<!-- For path_provider and shared_preferences -->
+	<key>NSDocumentsDirectoryUsageDescription</key>
+	<string>This app needs access to documents to save your preferences and cached data</string>
+	<key>NSDownloadsDirectoryUsageDescription</key>
+	<string>This app needs access to downloads to save files you choose to download</string>
+	
+	<!-- For network requests -->
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsArbitraryLoads</key>
 		<true/>
+		<key>NSAllowsArbitraryLoadsInWebContent</key>
+		<true/>
 	</dict>
+	
+	<!-- For photo library access -->
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>This app needs access to photo library for uploading images</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>This app needs access to photo library to save images</string>
+	
+	<!-- For Firebase Messaging -->
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>This app needs access to location when open to provide location-based notifications</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>This app needs access to location when in the background for location-based notifications</string>
 </dict>
 </plist>
