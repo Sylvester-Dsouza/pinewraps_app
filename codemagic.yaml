@@ -145,27 +145,20 @@ workflows:
           echo "Building iOS app with Flutter"
           flutter build ios --release --no-codesign
           
-          # Ensure the build directory exists
+          # Create a directory for the archive
           mkdir -p "$FCI_BUILD_DIR/build/ios/archive"
           
-          # Clean any previous archive to avoid conflicts
-          rm -rf "$FCI_BUILD_DIR/build/ios/archive/Runner.xcarchive" || true
-          
-          # Archive the app - using absolute paths to avoid any confusion
+          # Archive the app using xcodebuild
           echo "Archiving iOS app"
           cd "$FCI_BUILD_DIR"
-          xcodebuild clean -workspace ios/Runner.xcworkspace -scheme Runner
-          xcodebuild archive \
-            -workspace ios/Runner.xcworkspace \
+          xcodebuild -workspace ios/Runner.xcworkspace \
             -scheme Runner \
             -configuration Release \
             -sdk iphoneos \
             -archivePath "$FCI_BUILD_DIR/build/ios/archive/Runner.xcarchive" \
-            CODE_SIGN_IDENTITY="Apple Distribution" \
-            CODE_SIGNING_REQUIRED=YES \
-            CODE_SIGNING_ALLOWED=YES
+            archive
           
-          # Verify archive was created
+          # Check if archive was created
           if [ -d "$FCI_BUILD_DIR/build/ios/archive/Runner.xcarchive" ]; then
             echo "Archive created successfully at $FCI_BUILD_DIR/build/ios/archive/Runner.xcarchive"
             ls -la "$FCI_BUILD_DIR/build/ios/archive/Runner.xcarchive"
@@ -176,19 +169,18 @@ workflows:
             exit 1
           fi
           
-          # Export the app
-          echo "Exporting iOS app"
-          xcodebuild -exportArchive \
-            -archivePath "$FCI_BUILD_DIR/build/ios/archive/Runner.xcarchive" \
-            -exportOptionsPlist "$FCI_BUILD_DIR/ios/exportOptions.plist" \
-            -exportPath "$FCI_BUILD_DIR/build/ios/ipa"
-          
       - name: Create IPA
         script: |
           cd "$FCI_BUILD_DIR"
+          
           # Check if the archive exists
           if [ -d "$FCI_BUILD_DIR/build/ios/archive/Runner.xcarchive" ]; then
             echo "Archive exists, proceeding with export"
+            
+            # Create the export directory
+            mkdir -p "$FCI_BUILD_DIR/build/ios/ipa"
+            
+            # Export the IPA
             xcodebuild -exportArchive \
               -archivePath "$FCI_BUILD_DIR/build/ios/archive/Runner.xcarchive" \
               -exportOptionsPlist "$FCI_BUILD_DIR/ios/exportOptions.plist" \
@@ -429,27 +421,20 @@ workflows:
           echo "Building iOS app with Flutter"
           flutter build ios --release --no-codesign
           
-          # Ensure the build directory exists
+          # Create a directory for the archive
           mkdir -p "$FCI_BUILD_DIR/build/ios/archive"
           
-          # Clean any previous archive to avoid conflicts
-          rm -rf "$FCI_BUILD_DIR/build/ios/archive/Runner.xcarchive" || true
-          
-          # Archive the app - using absolute paths to avoid any confusion
+          # Archive the app using xcodebuild
           echo "Archiving iOS app"
           cd "$FCI_BUILD_DIR"
-          xcodebuild clean -workspace ios/Runner.xcworkspace -scheme Runner
-          xcodebuild archive \
-            -workspace ios/Runner.xcworkspace \
+          xcodebuild -workspace ios/Runner.xcworkspace \
             -scheme Runner \
             -configuration Release \
             -sdk iphoneos \
             -archivePath "$FCI_BUILD_DIR/build/ios/archive/Runner.xcarchive" \
-            CODE_SIGN_IDENTITY="Apple Distribution" \
-            CODE_SIGNING_REQUIRED=YES \
-            CODE_SIGNING_ALLOWED=YES
+            archive
           
-          # Verify archive was created
+          # Check if archive was created
           if [ -d "$FCI_BUILD_DIR/build/ios/archive/Runner.xcarchive" ]; then
             echo "Archive created successfully at $FCI_BUILD_DIR/build/ios/archive/Runner.xcarchive"
             ls -la "$FCI_BUILD_DIR/build/ios/archive/Runner.xcarchive"
@@ -460,19 +445,18 @@ workflows:
             exit 1
           fi
           
-          # Export the app
-          echo "Exporting iOS app"
-          xcodebuild -exportArchive \
-            -archivePath "$FCI_BUILD_DIR/build/ios/archive/Runner.xcarchive" \
-            -exportOptionsPlist "$FCI_BUILD_DIR/ios/exportOptions.plist" \
-            -exportPath "$FCI_BUILD_DIR/build/ios/ipa"
-          
       - name: Create iOS IPA
         script: |
           cd "$FCI_BUILD_DIR"
+          
           # Check if the archive exists
           if [ -d "$FCI_BUILD_DIR/build/ios/archive/Runner.xcarchive" ]; then
             echo "Archive exists, proceeding with export"
+            
+            # Create the export directory
+            mkdir -p "$FCI_BUILD_DIR/build/ios/ipa"
+            
+            # Export the IPA
             xcodebuild -exportArchive \
               -archivePath "$FCI_BUILD_DIR/build/ios/archive/Runner.xcarchive" \
               -exportOptionsPlist "$FCI_BUILD_DIR/ios/exportOptions.plist" \
