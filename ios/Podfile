@@ -65,6 +65,25 @@ end
 
 # Fix for pre-install hook - use generated_projects instead of pods_project
 pre_install do |installer|
+  # Handle Swift plugins that might be missing
+  swift_plugins = [
+    'webview_flutter_wkwebview',
+    'url_launcher_ios',
+    'sign_in_with_apple'
+  ]
+  
+  # Check if any Swift plugins are missing from the Pods directory
+  missing_plugins = swift_plugins.select do |plugin|
+    !Dir.exist?(File.join(installer.sandbox.root, plugin))
+  end
+  
+  # Log missing plugins
+  unless missing_plugins.empty?
+    puts "Warning: The following Swift plugins might be missing: #{missing_plugins.join(', ')}"
+    puts "This is normal if your app doesn't use these plugins."
+  end
+  
+  # Process generated projects
   installer.generated_projects.each do |project|
     project.targets.each do |target|
       flutter_additional_ios_build_settings(target)
@@ -74,6 +93,13 @@ pre_install do |installer|
         target.build_configurations.each do |config|
           config.build_settings['EXCLUDED_SOURCE_FILE_NAMES'] = ['*']
           config.build_settings['SKIP_INSTALL'] = 'YES'
+        end
+      end
+      
+      # Ensure Swift version is set correctly for Swift plugins
+      if swift_plugins.any? { |plugin| target.name.include?(plugin) }
+        target.build_configurations.each do |config|
+          config.build_settings['SWIFT_VERSION'] = '5.0'
         end
       end
     end
@@ -107,6 +133,26 @@ post_install do |installer|
         config.build_settings['ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES'] = 'NO'
         config.build_settings['COPY_PHASE_STRIP'] = 'YES'
         config.build_settings['STRIP_INSTALLED_PRODUCT'] = 'YES'
+      end
+      
+      # Handle Swift plugins specifically
+      swift_plugins = ['webview_flutter_wkwebview', 'url_launcher_ios', 'sign_in_with_apple']
+      if swift_plugins.any? { |plugin| target.name.include?(plugin) }
+        # Ensure Swift version is set correctly
+        config.build_settings['SWIFT_VERSION'] = '5.0'
+        
+        # Make sure Swift standard libraries are properly embedded
+        config.build_settings['ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES'] = 'YES'
+        
+        # Ensure Swift modules are properly built
+        config.build_settings['DEFINES_MODULE'] = 'YES'
+        
+        # Fix permissions for Swift files
+        if Dir.exist?(target.real_path)
+          Dir.glob(File.join(target.real_path, '**', '*.swift')).each do |swift_file|
+            File.chmod(0644, swift_file) rescue nil
+          end
+        end
       end
       
       # Add arm64 exclusion for simulators

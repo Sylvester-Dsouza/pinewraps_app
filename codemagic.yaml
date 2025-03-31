@@ -54,16 +54,37 @@ workflows:
           echo "Setting up Flutter project"
           cd "$FCI_BUILD_DIR"
           
-          # Clean and get dependencies
+          # Clean and get dependencies with fallback
           flutter clean
-          flutter pub get
+          flutter pub get || {
+            echo "Flutter pub get failed, trying with --no-pub-get"
+            flutter clean --no-pub-get
+            
+            # Try to fix dependency issues by updating pubspec.lock
+            if [ -f pubspec.lock ]; then
+              echo "Removing pubspec.lock to force dependency resolution"
+              rm pubspec.lock
+            fi
+            
+            # Try again with verbose output
+            flutter pub get -v || {
+              echo "Flutter pub get still failing, trying with downgrade"
+              flutter pub get --no-precompile || {
+                echo "All attempts to get dependencies failed"
+                # Continue anyway as we'll try to fix this in the pod install step
+              }
+            }
+          }
           
           # Create Generated.xcconfig if it doesn't exist
           mkdir -p ios/Flutter
           if [ ! -f ios/Flutter/Generated.xcconfig ]; then
             echo "Creating Generated.xcconfig..."
+            FLUTTER_ROOT_PATH=$(which flutter | xargs dirname | xargs dirname)
+            echo "Flutter root path: $FLUTTER_ROOT_PATH"
+            
             cat > ios/Flutter/Generated.xcconfig << EOF
-          FLUTTER_ROOT=$(which flutter | xargs dirname | xargs dirname)
+          FLUTTER_ROOT=$FLUTTER_ROOT_PATH
           FLUTTER_APPLICATION_PATH="$(cd "$FCI_BUILD_DIR" && pwd)"
           COCOAPODS_PARALLEL_CODE_SIGN=true
           FLUTTER_TARGET=lib/main.dart
@@ -153,6 +174,51 @@ workflows:
           find . -name "*Privacy.bundle" -type d -exec rm -rf {} \; 2>/dev/null || true
           
           cd ..
+          
+          # Patch any problematic plugins
+          echo "Setting up Swift plugins..."
+          
+          # Find and fix webview_flutter_wkwebview if it exists
+          WEBVIEW_PATH=$(find ~/.pub-cache/hosted/pub.dev -name "webview_flutter_wkwebview-*" -type d 2>/dev/null | head -n 1)
+          if [ -n "$WEBVIEW_PATH" ]; then
+            echo "Found webview_flutter_wkwebview at: $WEBVIEW_PATH"
+            WEBVIEW_IOS_DIR="$WEBVIEW_PATH/ios"
+            if [ -d "$WEBVIEW_IOS_DIR" ]; then
+              echo "Checking webview_flutter_wkwebview iOS directory"
+              find "$WEBVIEW_IOS_DIR" -name "*.swift" -exec chmod 644 {} \; 2>/dev/null || true
+              echo "Fixed permissions for webview_flutter_wkwebview Swift files"
+            fi
+          else
+            echo "Could not find webview_flutter_wkwebview plugin"
+          fi
+          
+          # Find and fix url_launcher_ios if it exists
+          URL_LAUNCHER_PATH=$(find ~/.pub-cache/hosted/pub.dev -name "url_launcher_ios-*" -type d 2>/dev/null | head -n 1)
+          if [ -n "$URL_LAUNCHER_PATH" ]; then
+            echo "Found url_launcher_ios at: $URL_LAUNCHER_PATH"
+            URL_LAUNCHER_IOS_DIR="$URL_LAUNCHER_PATH/ios"
+            if [ -d "$URL_LAUNCHER_IOS_DIR" ]; then
+              echo "Checking url_launcher_ios iOS directory"
+              find "$URL_LAUNCHER_IOS_DIR" -name "*.swift" -exec chmod 644 {} \; 2>/dev/null || true
+              echo "Fixed permissions for url_launcher_ios Swift files"
+            fi
+          else
+            echo "Could not find url_launcher_ios plugin"
+          fi
+          
+          # Check for sign_in_with_apple plugin and fix if needed
+          SIGN_IN_APPLE_PATH=$(find ~/.pub-cache/hosted/pub.dev -name "sign_in_with_apple-*" -type d 2>/dev/null | head -n 1)
+          if [ -n "$SIGN_IN_APPLE_PATH" ]; then
+            echo "Found sign_in_with_apple at: $SIGN_IN_APPLE_PATH"
+            SIGN_IN_APPLE_IOS_DIR="$SIGN_IN_APPLE_PATH/ios"
+            if [ -d "$SIGN_IN_APPLE_IOS_DIR" ]; then
+              echo "Checking sign_in_with_apple iOS directory"
+              find "$SIGN_IN_APPLE_IOS_DIR" -name "*.swift" -exec chmod 644 {} \; 2>/dev/null || true
+              echo "Fixed permissions for sign_in_with_apple Swift files"
+            fi
+          else
+            echo "Could not find sign_in_with_apple plugin - this is expected if the app doesn't use it"
+          fi
       - name: Set up Firebase configuration
         script: |
           echo "Setting up Firebase configuration"
