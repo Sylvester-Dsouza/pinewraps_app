@@ -324,17 +324,12 @@ workflows:
               cp "$SQFLITE_SOURCES/SqfliteOperation.m" "$SQFLITE_SOURCES/backup/"
               
               # Create patch header file
-              cat > "$SQFLITE_SOURCES/sqflite_darwin_patch.h" << 'EOFMARKER'
-// sqflite_darwin_patch.h
-// This header defines necessary SQLite flags for sqflite_darwin
-
-#ifndef SQFLITE_DARWIN_PATCH_H
-#define SQFLITE_DARWIN_PATCH_H
-
-#define SQLITE_ENABLE_COLUMN_METADATA 1
-
-#endif /* SQFLITE_DARWIN_PATCH_H */
-EOFMARKER
+              echo "#ifndef SQFLITE_DARWIN_PATCH_H" > "$SQFLITE_SOURCES/sqflite_darwin_patch.h"
+              echo "#define SQFLITE_DARWIN_PATCH_H" >> "$SQFLITE_SOURCES/sqflite_darwin_patch.h"
+              echo "" >> "$SQFLITE_SOURCES/sqflite_darwin_patch.h"
+              echo "#define SQLITE_ENABLE_COLUMN_METADATA 1" >> "$SQFLITE_SOURCES/sqflite_darwin_patch.h"
+              echo "" >> "$SQFLITE_SOURCES/sqflite_darwin_patch.h"
+              echo "#endif /* SQFLITE_DARWIN_PATCH_H */" >> "$SQFLITE_SOURCES/sqflite_darwin_patch.h"
               
               # Add SQLite column metadata preprocessor definition to all .m files
               for file in "$SQFLITE_SOURCES/SqfliteDatabase.m" "$SQFLITE_SOURCES/SqflitePlugin.m" "$SQFLITE_SOURCES/SqfliteOperation.m"; do
