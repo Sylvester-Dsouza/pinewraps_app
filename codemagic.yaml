@@ -11,34 +11,32 @@ workflows:
         bundle_identifier: com.pinewraps.app
       vars:
         IOS_BUNDLE_ID: "com.pinewraps.app"
-        CERTIFICATE_PRIVATE_KEY: ${CERTIFICATE_PRIVATE_KEY}
-        CERTIFICATE_PASSWORD: ${CERTIFICATE_PASSWORD}
+        APP_STORE_CONNECT_ISSUER_ID: ${APP_STORE_CONNECT_ISSUER_ID}
+        APP_STORE_CONNECT_KEY_IDENTIFIER: ${APP_STORE_CONNECT_KEY_IDENTIFIER}
+        APP_STORE_CONNECT_PRIVATE_KEY: ${APP_STORE_CONNECT_PRIVATE_KEY}
     scripts:
       - name: Set up code signing
         script: |
-          echo "Setting up code signing for iOS production/distribution"
+          echo "Setting up code signing with App Store Connect API"
           # Initialize keychain
           keychain initialize
           
-          # Use the distribution certificate from Codemagic
-          echo "Using distribution certificate from Codemagic"
-          if [[ -n ${CERTIFICATE_PRIVATE_KEY} ]]; then
-            # Create a temporary directory for the certificate
-            CERTIFICATE_PATH=$(mktemp -d)
-            echo ${CERTIFICATE_PRIVATE_KEY} | base64 --decode > $CERTIFICATE_PATH/certificate.p12
+          # Use App Store Connect API for code signing
+          if [ -n "$APP_STORE_CONNECT_ISSUER_ID" ] && [ -n "$APP_STORE_CONNECT_KEY_IDENTIFIER" ] && [ -n "$APP_STORE_CONNECT_PRIVATE_KEY" ]; then
+            echo "Using App Store Connect API for code signing"
+            # First, create the app in App Store Connect if it doesn't exist
+            app-store-connect create-app "$IOS_BUNDLE_ID" "Pinewraps" --skip-if-exists
             
-            # Import the certificate to keychain
-            keychain add-certificates \
-              --certificate $CERTIFICATE_PATH/certificate.p12 \
-              --certificate-password ${CERTIFICATE_PASSWORD}
-              
-            # Use the CERT_DISTRIBUTION reference for automatic matching
-            # This will automatically match the certificate with the correct provisioning profile
-            keychain use-certificate CERT_DISTRIBUTION
+            # Then fetch or create the signing files
+            app-store-connect fetch-signing-files "$IOS_BUNDLE_ID" --type IOS_APP_STORE --create
             
-            echo "Distribution certificate imported successfully"
+            # Check if the profile was created successfully
+            if [ $? -ne 0 ]; then
+              echo "Failed to fetch or create provisioning profile. Please check your App Store Connect API credentials."
+              exit 1
+            fi
           else
-            echo "Error: CERTIFICATE_PRIVATE_KEY not found"
+            echo "Error: App Store Connect API credentials not found. Cannot proceed with code signing."
             exit 1
           fi
           
@@ -183,8 +181,9 @@ workflows:
         bundle_identifier: com.pinewraps.app
       vars:
         IOS_BUNDLE_ID: "com.pinewraps.app"
-        CERTIFICATE_PRIVATE_KEY: ${CERTIFICATE_PRIVATE_KEY}
-        CERTIFICATE_PASSWORD: ${CERTIFICATE_PASSWORD}
+        APP_STORE_CONNECT_ISSUER_ID: ${APP_STORE_CONNECT_ISSUER_ID}
+        APP_STORE_CONNECT_KEY_IDENTIFIER: ${APP_STORE_CONNECT_KEY_IDENTIFIER}
+        APP_STORE_CONNECT_PRIVATE_KEY: ${APP_STORE_CONNECT_PRIVATE_KEY}
     triggering:
       events:
         - push
@@ -195,29 +194,26 @@ workflows:
       # iOS setup and build
       - name: Set up iOS code signing
         script: |
-          echo "Setting up code signing for iOS production/distribution"
+          echo "Setting up code signing with App Store Connect API"
           # Initialize keychain
           keychain initialize
           
-          # Use the distribution certificate from Codemagic
-          echo "Using distribution certificate from Codemagic"
-          if [[ -n ${CERTIFICATE_PRIVATE_KEY} ]]; then
-            # Create a temporary directory for the certificate
-            CERTIFICATE_PATH=$(mktemp -d)
-            echo ${CERTIFICATE_PRIVATE_KEY} | base64 --decode > $CERTIFICATE_PATH/certificate.p12
+          # Use App Store Connect API for code signing
+          if [ -n "$APP_STORE_CONNECT_ISSUER_ID" ] && [ -n "$APP_STORE_CONNECT_KEY_IDENTIFIER" ] && [ -n "$APP_STORE_CONNECT_PRIVATE_KEY" ]; then
+            echo "Using App Store Connect API for code signing"
+            # First, create the app in App Store Connect if it doesn't exist
+            app-store-connect create-app "$IOS_BUNDLE_ID" "Pinewraps" --skip-if-exists
             
-            # Import the certificate to keychain
-            keychain add-certificates \
-              --certificate $CERTIFICATE_PATH/certificate.p12 \
-              --certificate-password ${CERTIFICATE_PASSWORD}
-              
-            # Use the CERT_DISTRIBUTION reference for automatic matching
-            # This will automatically match the certificate with the correct provisioning profile
-            keychain use-certificate CERT_DISTRIBUTION
+            # Then fetch or create the signing files
+            app-store-connect fetch-signing-files "$IOS_BUNDLE_ID" --type IOS_APP_STORE --create
             
-            echo "Distribution certificate imported successfully"
+            # Check if the profile was created successfully
+            if [ $? -ne 0 ]; then
+              echo "Failed to fetch or create provisioning profile. Please check your App Store Connect API credentials."
+              exit 1
+            fi
           else
-            echo "Error: CERTIFICATE_PRIVATE_KEY not found"
+            echo "Error: App Store Connect API credentials not found. Cannot proceed with code signing."
             exit 1
           fi
           
