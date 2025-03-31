@@ -41,16 +41,28 @@ workflows:
               echo "Bundle ID already exists"
             fi
             
-            # Fetch or create the signing files
-            echo "Fetching or creating signing files..."
+            # Fetch or create the development signing files
+            echo "Fetching or creating development signing files..."
+            app-store-connect fetch-signing-files --issuer-id "$APP_STORE_CONNECT_ISSUER_ID" --key-id "$APP_STORE_CONNECT_KEY_IDENTIFIER" --private-key "$PRIVATE_KEY_PATH" --type IOS_APP_DEVELOPMENT --create "$IOS_BUNDLE_ID"
+            
+            # Fetch or create the distribution signing files
+            echo "Fetching or creating distribution signing files..."
             app-store-connect fetch-signing-files --issuer-id "$APP_STORE_CONNECT_ISSUER_ID" --key-id "$APP_STORE_CONNECT_KEY_IDENTIFIER" --private-key "$PRIVATE_KEY_PATH" --type IOS_APP_STORE --create "$IOS_BUNDLE_ID"
             
             # Clean up the temporary file
             rm "$PRIVATE_KEY_PATH"
             
-            # Check if the profile was created successfully
+            # Check if the profiles were created successfully
             if [ $? -eq 0 ]; then
               echo "Successfully set up code signing with App Store Connect API"
+              
+              # List available certificates
+              echo "Available certificates:"
+              security find-identity -v -p codesigning
+              
+              # List available provisioning profiles
+              echo "Available provisioning profiles:"
+              ls -la ~/Library/MobileDevice/Provisioning\ Profiles/
             else
               echo "Failed to fetch or create provisioning profile. Please check your App Store Connect API credentials."
               echo "Make sure your Apple Developer account has the necessary permissions."
@@ -114,9 +126,35 @@ workflows:
           
       - name: Flutter build iOS
         script: |
-          cd "$FCI_BUILD_DIR"
-          flutter build ios --release
+          # Set up local properties
+          echo "Setting up Flutter project"
+          cd pinewraps_app
           
+          # Explicitly set development team in project settings
+          echo "Setting development team in project settings"
+          DEVELOPMENT_TEAM=$(security find-certificate -c "Apple Development" | grep "alis" | head -1 | awk -F'"' '{print $4}' | cut -d'(' -f2 | cut -d')' -f1)
+          if [ -n "$DEVELOPMENT_TEAM" ]; then
+            echo "Found development team: $DEVELOPMENT_TEAM"
+            /usr/libexec/PlistBuddy -c "Set :DEVELOPMENT_TEAM $DEVELOPMENT_TEAM" ios/Flutter/Generated.xcconfig || true
+            /usr/libexec/PlistBuddy -c "Set :DEVELOPMENT_TEAM $DEVELOPMENT_TEAM" ios/Runner.xcodeproj/project.pbxproj || true
+          else
+            echo "Warning: Could not find development team"
+          fi
+          
+          # Build the app
+          echo "Building iOS app"
+          flutter build ios --release --no-codesign
+          
+          # Archive the app
+          echo "Archiving iOS app"
+          xcodebuild -workspace ios/Runner.xcworkspace -scheme Runner -configuration Release -archivePath build/ios/Runner.xcarchive archive
+          
+          # Export the app
+          echo "Exporting iOS app"
+          xcodebuild -exportArchive -archivePath build/ios/Runner.xcarchive -exportOptionsPlist ios/ExportOptions.plist -exportPath build/ios/ipa
+          
+          cd ..
+
       - name: Create IPA
         script: |
           cd "$FCI_BUILD_DIR/ios"
@@ -239,16 +277,28 @@ workflows:
               echo "Bundle ID already exists"
             fi
             
-            # Fetch or create the signing files
-            echo "Fetching or creating signing files..."
+            # Fetch or create the development signing files
+            echo "Fetching or creating development signing files..."
+            app-store-connect fetch-signing-files --issuer-id "$APP_STORE_CONNECT_ISSUER_ID" --key-id "$APP_STORE_CONNECT_KEY_IDENTIFIER" --private-key "$PRIVATE_KEY_PATH" --type IOS_APP_DEVELOPMENT --create "$IOS_BUNDLE_ID"
+            
+            # Fetch or create the distribution signing files
+            echo "Fetching or creating distribution signing files..."
             app-store-connect fetch-signing-files --issuer-id "$APP_STORE_CONNECT_ISSUER_ID" --key-id "$APP_STORE_CONNECT_KEY_IDENTIFIER" --private-key "$PRIVATE_KEY_PATH" --type IOS_APP_STORE --create "$IOS_BUNDLE_ID"
             
             # Clean up the temporary file
             rm "$PRIVATE_KEY_PATH"
             
-            # Check if the profile was created successfully
+            # Check if the profiles were created successfully
             if [ $? -eq 0 ]; then
               echo "Successfully set up code signing with App Store Connect API"
+              
+              # List available certificates
+              echo "Available certificates:"
+              security find-identity -v -p codesigning
+              
+              # List available provisioning profiles
+              echo "Available provisioning profiles:"
+              ls -la ~/Library/MobileDevice/Provisioning\ Profiles/
             else
               echo "Failed to fetch or create provisioning profile. Please check your App Store Connect API credentials."
               echo "Make sure your Apple Developer account has the necessary permissions."
@@ -261,59 +311,38 @@ workflows:
           
       - name: Set up iOS Firebase configuration
         script: |
-          echo "Setting up iOS Firebase configuration"
-          mkdir -p "$FCI_BUILD_DIR/ios/Runner"
-          # Create the file manually from the known content
-          cat > "$FCI_BUILD_DIR/ios/Runner/GoogleService-Info.plist" << 'EOF'
-          <?xml version="1.0" encoding="UTF-8"?>
-          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-          <plist version="1.0">
-          <dict>
-            <key>CLIENT_ID</key>
-            <string>181991178384-0768pbr5j4b0svq374ql8jmqm8lha5gi.apps.googleusercontent.com</string>
-            <key>REVERSED_CLIENT_ID</key>
-            <string>com.googleusercontent.apps.181991178384-0768pbr5j4b0svq374ql8jmqm8lha5gi</string>
-            <key>ANDROID_CLIENT_ID</key>
-            <string>181991178384-egso4atj877ghd4c2tgiv9rg2c15715o.apps.googleusercontent.com</string>
-            <key>API_KEY</key>
-            <string>AIzaSyAacRdIMeUJyGAUeEj8Qb2bliZ-tySRCj8</string>
-            <key>GCM_SENDER_ID</key>
-            <string>181991178384</string>
-            <key>PLIST_VERSION</key>
-            <string>1</string>
-            <key>BUNDLE_ID</key>
-            <string>com.pinewraps.app</string>
-            <key>PROJECT_ID</key>
-            <string>pinewraps-23e8a</string>
-            <key>STORAGE_BUCKET</key>
-            <string>pinewraps-23e8a.firebasestorage.app</string>
-            <key>IS_ADS_ENABLED</key>
-            <false></false>
-            <key>IS_ANALYTICS_ENABLED</key>
-            <false></false>
-            <key>IS_APPINVITE_ENABLED</key>
-            <true></true>
-            <key>IS_GCM_ENABLED</key>
-            <true></true>
-            <key>IS_SIGNIN_ENABLED</key>
-            <true></true>
-            <key>GOOGLE_APP_ID</key>
-            <string>1:181991178384:ios:a5699293807394f7485815</string>
-          </dict>
-          </plist>
-          EOF
-          echo "Created GoogleService-Info.plist manually"
-          
-      - name: Run iOS prebuild script
-        script: |
-          echo "Running iOS prebuild script"
-          chmod +x "$FCI_BUILD_DIR/ios_prebuild.sh"
-          "$FCI_BUILD_DIR/ios_prebuild.sh"
-          
+{{ ... }}
+      
       - name: Flutter build iOS
         script: |
-          cd "$FCI_BUILD_DIR"
-          flutter build ios --release
+          # Set up local properties
+          echo "Setting up Flutter project"
+          cd pinewraps_app
+          
+          # Explicitly set development team in project settings
+          echo "Setting development team in project settings"
+          DEVELOPMENT_TEAM=$(security find-certificate -c "Apple Development" | grep "alis" | head -1 | awk -F'"' '{print $4}' | cut -d'(' -f2 | cut -d')' -f1)
+          if [ -n "$DEVELOPMENT_TEAM" ]; then
+            echo "Found development team: $DEVELOPMENT_TEAM"
+            /usr/libexec/PlistBuddy -c "Set :DEVELOPMENT_TEAM $DEVELOPMENT_TEAM" ios/Flutter/Generated.xcconfig || true
+            /usr/libexec/PlistBuddy -c "Set :DEVELOPMENT_TEAM $DEVELOPMENT_TEAM" ios/Runner.xcodeproj/project.pbxproj || true
+          else
+            echo "Warning: Could not find development team"
+          fi
+          
+          # Build the app
+          echo "Building iOS app"
+          flutter build ios --release --no-codesign
+          
+          # Archive the app
+          echo "Archiving iOS app"
+          xcodebuild -workspace ios/Runner.xcworkspace -scheme Runner -configuration Release -archivePath build/ios/Runner.xcarchive archive
+          
+          # Export the app
+          echo "Exporting iOS app"
+          xcodebuild -exportArchive -archivePath build/ios/Runner.xcarchive -exportOptionsPlist ios/ExportOptions.plist -exportPath build/ios/ipa
+          
+          cd ..
           
       - name: Create iOS IPA
         script: |

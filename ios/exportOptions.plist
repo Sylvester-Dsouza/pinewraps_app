@@ -3,15 +3,15 @@
 <plist version="1.0">
 <dict>
     <key>method</key>
-    <string>development</string>
+    <string>app-store</string>
     <key>teamID</key>
-    <string>YOUR_TEAM_ID</string>
+    <string>4J9WXB52YV</string>
     <key>signingStyle</key>
     <string>automatic</string>
     <key>provisioningProfiles</key>
     <dict>
         <key>com.pinewraps.app</key>
-        <string>Pinewraps Development</string>
+        <string>Pinewraps App</string>
     </dict>
 </dict>
 </plist>
