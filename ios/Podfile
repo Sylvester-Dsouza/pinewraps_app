@@ -26,6 +26,21 @@ require File.expand_path(File.join('packages', 'flutter_tools', 'bin', 'podhelpe
 
 flutter_ios_podfile_setup
 
+# Prevent Pods from creating privacy bundles
+pre_install do |installer|
+  Pod::Installer::Xcode::TargetValidator.send(:define_method, :verify_no_static_framework_transitive_dependencies) {}
+  installer.pod_targets.each do |pod|
+    if pod.name.include?('webview_flutter') || pod.name.include?('url_launcher')
+      def pod.build_type
+        Pod::BuildType.static_library
+      end
+      def pod.should_build?
+        true
+      end
+    end
+  end
+end
+
 target 'Runner' do
   use_frameworks! :linkage => :static
   use_modular_headers!
@@ -40,110 +55,74 @@ target 'Runner' do
   pod 'GoogleDataTransport', :modular_headers => true
   
   post_install do |installer|
-    # COMPLETELY REMOVE ALL PRIVACY BUNDLE TARGETS
     installer.pods_project.targets.each do |target|
-      if target.name.end_with?('_privacy') || 
-         target.name.end_with?('-privacy') || 
-         target.name.end_with?('Privacy') || 
-         target.name.include?('privacy')
-        
-        # Remove the target from all build phases
-        target.build_phases.clear
-        
-        # Disable the target completely
-        target.build_configurations.each do |config|
-          # Exclude all source files
-          config.build_settings['EXCLUDED_SOURCE_FILE_NAMES'] = '*'
-          
-          # Disable code signing
-          config.build_settings['CODE_SIGNING_ALLOWED'] = 'NO'
-          config.build_settings['CODE_SIGNING_REQUIRED'] = 'NO'
-          config.build_settings['CODE_SIGN_IDENTITY'] = ''
-          
-          # Skip installation
-          config.build_settings['SKIP_INSTALL'] = 'YES'
-          
-          # Set deployment target
-          config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '12.0'
-          
-          # Disable Swift standard libraries embedding
-          config.build_settings['ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES'] = 'NO'
-          
-          # Set proper bundle configuration
-          config.build_settings['WRAPPER_EXTENSION'] = 'bundle'
-          config.build_settings['MACH_O_TYPE'] = 'mh_bundle'
-          
-          # Disable bitcode
-          config.build_settings['ENABLE_BITCODE'] = 'NO'
-          
-          # Set build active architecture only
-          config.build_settings['ONLY_ACTIVE_ARCH'] = 'NO'
-          
-          # Exclude architectures
-          config.build_settings['EXCLUDED_ARCHS'] = 'arm64'
-        end
-      end
-      
-      # Remove privacy bundles from resource bundles in all targets
-      if target.respond_to?(:product_type) && target.product_type == 'com.apple.product-type.framework'
-        target.build_configurations.each do |config|
-          # Remove privacy bundles from resources
-          config.build_settings['RESOURCES'] = ''
-        end
-      end
-    end
-    
-    # Fix main targets
-    installer.pods_project.targets.each do |target|
-      flutter_additional_ios_build_settings(target)
-      
       target.build_configurations.each do |config|
-        # Set Swift version for all targets
-        config.build_settings['SWIFT_VERSION'] = '5.0'
+        # Ensure proper deployment target
+        config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '12.0'
         
         # Disable bitcode for all targets
         config.build_settings['ENABLE_BITCODE'] = 'NO'
         
-        # Set deployment target for all targets
-        config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '12.0'
+        # Force static linking for all pods
+        config.build_settings['MACH_O_TYPE'] = 'staticlib'
         
-        # Ensure proper Swift support
-        if !target.name.include?('privacy') && !target.name.include?('Privacy')
-          # Ensure Swift standard libraries are embedded for non-privacy targets
+        # Ensure proper Swift version
+        if config.build_settings['SWIFT_VERSION'].nil?
+          config.build_settings['SWIFT_VERSION'] = '5.0'
+        end
+        
+        # Handle privacy bundles
+        if target.name.end_with?('_privacy') || target.name.end_with?('-privacy') || target.name.end_with?('Privacy')
+          config.build_settings['SWIFT_INSTALL_OBJC_HEADER'] = 'NO'
+          config.build_settings['SWIFT_OBJC_INTERFACE_HEADER_NAME'] = ''
+          config.build_settings['DEAD_CODE_STRIPPING'] = 'YES'
+          config.build_settings['ONLY_ACTIVE_ARCH'] = 'NO'
+          config.build_settings['ENABLE_TESTABILITY'] = 'NO'
+          config.build_settings['DYLIB_INSTALL_NAME_BASE'] = ''
+          config.build_settings['STRIP_INSTALLED_PRODUCT'] = 'YES'
+          config.build_settings['DEPLOYMENT_POSTPROCESSING'] = 'YES'
+          config.build_settings['SKIP_INSTALL'] = 'YES'
+          config.build_settings['COPY_PHASE_STRIP'] = 'YES'
+          config.build_settings['STRIP_STYLE'] = 'non-global'
+          config.build_settings['SEPARATE_STRIP'] = 'YES'
+          config.build_settings['EXCLUDED_SOURCE_FILE_NAMES'] = '*'
+          config.build_settings['CLANG_ENABLE_MODULE_DEBUGGING'] = 'NO'
+          config.build_settings['GCC_OPTIMIZATION_LEVEL'] = 's'
+          config.build_settings['LLVM_LTO'] = 'YES'
+          config.build_settings['PRESERVE_DEAD_CODE_INITS_AND_TERMS'] = 'NO'
+          config.build_settings['ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES'] = 'NO'
+          config.build_settings['EMBEDDED_CONTENT_CONTAINS_SWIFT'] = 'NO'
+          config.build_settings['LD_VERIFY_BITCODE'] = 'NO'
+          config.build_settings['CODE_SIGNING_ALLOWED'] = 'NO'
+          config.build_settings['CODE_SIGNING_REQUIRED'] = 'NO'
+          config.build_settings['CODE_SIGN_IDENTITY'] = ''
+          config.build_settings['OTHER_LDFLAGS'] = ''
+        else
+          # For non-privacy bundle targets
           config.build_settings['ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES'] = 'YES'
-          
-          # Ensure Swift modules are embedded
-          config.build_settings['LD_RUNPATH_SEARCH_PATHS'] ||= [
-            '$(inherited)',
-            '@executable_path/Frameworks',
-            '@loader_path/Frameworks'
-          ]
-        end
-        
-        # Special handling for specific plugins
-        if target.name == 'sign_in_with_apple'
           config.build_settings['BUILD_LIBRARY_FOR_DISTRIBUTION'] = 'YES'
+          config.build_settings['DEAD_CODE_STRIPPING'] = 'YES'
+          config.build_settings['CLANG_ENABLE_MODULES'] = 'YES'
+          config.build_settings['DEFINES_MODULE'] = 'YES'
+          config.build_settings['SWIFT_OPTIMIZATION_LEVEL'] = '-O'
         end
-        
-        # Add SQLite flags to sqflite targets
-        if ['sqflite', 'sqflite_darwin'].include?(target.name)
-          # Add SQLite flags
-          config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] ||= ['$(inherited)']
-          config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] << 'SQLITE_ENABLE_COLUMN_METADATA=1'
-        end
+      end
+      
+      # Remove privacy bundle targets from build phases
+      if target.name.end_with?('_privacy') || target.name.end_with?('-privacy') || target.name.end_with?('Privacy')
+        target.build_phases.clear
       end
     end
     
-    # Modify main project settings
-    installer.generated_projects.each do |project|
-      project.build_configurations.each do |config|
-        config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '12.0'
-        config.build_settings['ENABLE_BITCODE'] = 'NO'
+    # Fix for Xcode 15 resource bundle issue
+    installer.aggregate_targets.each do |target|
+      target.xcconfigs.each do |variant, xcconfig|
+        xcconfig_path = target.client_root + target.xcconfig_relative_path(variant)
+        IO.write(xcconfig_path, IO.read(xcconfig_path).gsub("DT_TOOLCHAIN_DIR", "TOOLCHAIN_DIR"))
       end
-      
-      # Save the project
-      project.save
     end
+    
+    installer.pods_project.save
   end
 end
 
