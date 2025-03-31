@@ -192,6 +192,46 @@ for plugin in "${SWIFT_PLUGINS[@]}"; do
   fi
 done
 
+# Fix webview_flutter_wkwebview_privacy.bundle issue
+echo "Fixing webview_flutter_wkwebview_privacy.bundle issue..."
+WEBVIEW_PRIVACY_DIR="Pods/webview_flutter_wkwebview/ios/webview_flutter_wkwebview_privacy.bundle"
+if [ -d "$WEBVIEW_PRIVACY_DIR" ]; then
+  echo "Found webview_flutter_wkwebview_privacy.bundle"
+  
+  # Create a simple Info.plist if it doesn't exist
+  if [ ! -f "$WEBVIEW_PRIVACY_DIR/Info.plist" ]; then
+    echo "Creating Info.plist for webview_flutter_wkwebview_privacy.bundle"
+    cat > "$WEBVIEW_PRIVACY_DIR/Info.plist" << 'EOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>en</string>
+	<key>CFBundleIdentifier</key>
+	<string>org.cocoapods.webview-flutter-wkwebview-privacy</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>webview_flutter_wkwebview_privacy</string>
+	<key>CFBundlePackageType</key>
+	<string>BNDL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>1.0.0</string>
+	<key>CFBundleSignature</key>
+	<string>????</string>
+	<key>CFBundleVersion</key>
+	<string>1</string>
+	<key>NSPrincipalClass</key>
+	<string></string>
+</dict>
+</plist>
+EOF
+  fi
+else
+  echo "webview_flutter_wkwebview_privacy.bundle not found"
+fi
+
 # Return to project root
 cd ..
 
