@@ -155,8 +155,7 @@ workflows:
             -sdk iphoneos \
             -archivePath "$FCI_BUILD_DIR/build/ios/archive/Runner.xcarchive" \
             DEVELOPMENT_TEAM="4J9WXB52YV" \
-            PROVISIONING_PROFILE_SPECIFIER="Pinewraps App" \
-            CODE_SIGN_IDENTITY="iPhone Distribution"
+            CODE_SIGN_STYLE="Automatic"
           
           # Check if archive was created
           if [ -d "$FCI_BUILD_DIR/build/ios/archive/Runner.xcarchive" ]; then
@@ -432,8 +431,7 @@ workflows:
             -sdk iphoneos \
             -archivePath "$FCI_BUILD_DIR/build/ios/archive/Runner.xcarchive" \
             DEVELOPMENT_TEAM="4J9WXB52YV" \
-            PROVISIONING_PROFILE_SPECIFIER="Pinewraps App" \
-            CODE_SIGN_IDENTITY="iPhone Distribution"
+            CODE_SIGN_STYLE="Automatic"
           
           # Check if archive was created
           if [ -d "$FCI_BUILD_DIR/build/ios/archive/Runner.xcarchive" ]; then

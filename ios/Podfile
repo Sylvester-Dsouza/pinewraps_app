@@ -47,12 +47,21 @@ target 'Runner' do
     installer.pods_project.build_configurations.each do |config|
       config.build_settings["EXCLUDED_ARCHS[sdk=iphonesimulator*]"] = "arm64"
       config.build_settings['ONLY_ACTIVE_ARCH'] = 'YES'
+      
+      # Ensure automatic signing for all pods
+      config.build_settings['CODE_SIGN_IDENTITY'] = ""
+      config.build_settings['CODE_SIGNING_REQUIRED'] = "NO"
+      config.build_settings['CODE_SIGNING_ALLOWED'] = "NO"
+      config.build_settings['PROVISIONING_PROFILE_SPECIFIER'] = ""
     end
     
     installer.pods_project.targets.each do |target|
       target.build_configurations.each do |config|
-        # Don't disable code signing completely as it can cause issues with Codemagic
-        # Instead, let Codemagic handle code signing
+        # Ensure automatic signing for all pods
+        config.build_settings['CODE_SIGN_IDENTITY'] = ""
+        config.build_settings['CODE_SIGNING_REQUIRED'] = "NO"
+        config.build_settings['CODE_SIGNING_ALLOWED'] = "NO"
+        config.build_settings['PROVISIONING_PROFILE_SPECIFIER'] = ""
         config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '13.0'
         
         # Fix for modular header issues with Firebase
