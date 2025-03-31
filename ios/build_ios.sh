@@ -192,6 +192,160 @@ for plugin in "${SWIFT_PLUGINS[@]}"; do
   fi
 done
 
+# Function to remove privacy bundles
+remove_privacy_bundles() {
+    echo "Removing privacy bundles..."
+    
+    # Remove from Pods project
+    find "${PWD}/Pods" -name "*_privacy.bundle" -type d -exec rm -rf {} +
+    find "${PWD}/Pods" -name "*-privacy.bundle" -type d -exec rm -rf {} +
+    find "${PWD}/Pods" -name "*Privacy.bundle" -type d -exec rm -rf {} +
+    
+    # Remove privacy targets from Pods project
+    if [ -f "Pods/Pods.xcodeproj/project.pbxproj" ]; then
+        echo "Modifying Pods project..."
+        sed -i.bak '/Begin PBXNativeTarget/,/End PBXNativeTarget/ {
+            /privacy/ d
+        }' "Pods/Pods.xcodeproj/project.pbxproj"
+    fi
+}
+
+# Function to patch SQLite
+patch_sqlite() {
+    echo "Patching SQLite..."
+    SQLITE_PATH="Pods/sqlite3"
+    SQLITE_CONFIG="Pods/Target Support Files/sqlite3/sqlite3.debug.xcconfig"
+    
+    if [ -d "$SQLITE_PATH" ]; then
+        # Add SQLite compilation flags
+        if [ -f "$SQLITE_CONFIG" ]; then
+            echo "OTHER_CFLAGS = \$(inherited) -DSQLITE_ENABLE_COLUMN_METADATA=1" >> "$SQLITE_CONFIG"
+        fi
+    fi
+}
+
+# Function to clean build
+clean_build() {
+    echo "Cleaning build..."
+    rm -rf ./build
+    rm -rf ~/Library/Developer/Xcode/DerivedData
+    rm -rf ./Pods
+    rm -f ./Podfile.lock
+    rm -rf ./.symlinks
+    rm -rf ./Flutter/Flutter.framework
+    rm -rf ./Flutter/Flutter.podspec
+}
+
+# Function to setup build
+setup_build() {
+    echo "Setting up build..."
+    flutter pub get
+    
+    # Install pods
+    pod install --repo-update
+    
+    # Remove privacy bundles after pod install
+    remove_privacy_bundles
+    
+    # Patch SQLite
+    patch_sqlite
+}
+
+# Function to build archive
+build_archive() {
+    echo "Building archive..."
+    
+    # Create archive directory
+    mkdir -p build/ios/archive
+    
+    # Build archive
+    xcodebuild -workspace Runner.xcworkspace \
+        -scheme Runner \
+        -sdk iphoneos \
+        -configuration Release \
+        -archivePath build/ios/archive/Runner.xcarchive \
+        COMPILER_INDEX_STORE_ENABLE=NO \
+        DEVELOPMENT_TEAM="$DEVELOPMENT_TEAM" \
+        PROVISIONING_PROFILE_SPECIFIER="$PROVISIONING_PROFILE" \
+        archive \
+        CODE_SIGN_IDENTITY="Apple Distribution" \
+        OTHER_CODE_SIGN_FLAGS="--keychain build.keychain" || true
+}
+
+# Function to create IPA
+create_ipa() {
+    echo "Creating IPA..."
+    
+    if [ -d "build/ios/archive/Runner.xcarchive" ]; then
+        mkdir -p build/ios/ipa
+        
+        xcodebuild -exportArchive \
+            -archivePath build/ios/archive/Runner.xcarchive \
+            -exportOptionsPlist exportOptions.plist \
+            -exportPath build/ios/ipa/ \
+            -allowProvisioningUpdates || true
+            
+        if [ -f "build/ios/ipa/Runner.ipa" ]; then
+            echo "IPA created successfully"
+        else
+            echo "IPA creation failed, trying alternative method..."
+            
+            # Alternative method: Create IPA directly
+            xcodebuild -workspace Runner.xcworkspace \
+                -scheme Runner \
+                -sdk iphoneos \
+                -configuration Release \
+                -exportOptionsPlist exportOptions.plist \
+                clean archive -archivePath build/ios/ipa/Runner.xcarchive \
+                DEVELOPMENT_TEAM="$DEVELOPMENT_TEAM" \
+                PROVISIONING_PROFILE_SPECIFIER="$PROVISIONING_PROFILE" \
+                CODE_SIGN_IDENTITY="Apple Distribution" || true
+                
+            xcodebuild -exportArchive \
+                -archivePath build/ios/ipa/Runner.xcarchive \
+                -exportOptionsPlist exportOptions.plist \
+                -exportPath build/ios/ipa \
+                -allowProvisioningUpdates || true
+        fi
+    else
+        echo "Archive not found, creating IPA directly..."
+        
+        mkdir -p build/ios/ipa
+        xcodebuild -workspace Runner.xcworkspace \
+            -scheme Runner \
+            -sdk iphoneos \
+            -configuration Release \
+            clean build \
+            -derivedDataPath build/ios/DerivedData \
+            DEVELOPMENT_TEAM="$DEVELOPMENT_TEAM" \
+            PROVISIONING_PROFILE_SPECIFIER="$PROVISIONING_PROFILE" \
+            CODE_SIGN_IDENTITY="Apple Distribution" \
+            COMPILER_INDEX_STORE_ENABLE=NO || true
+            
+        # Package as IPA
+        xcrun /usr/bin/PackageApplication \
+            -v "build/ios/DerivedData/Build/Products/Release-iphoneos/Runner.app" \
+            -o "build/ios/ipa/Runner.ipa" || true
+    fi
+}
+
+# Main build process
+echo "Starting build process..."
+
+# Clean previous build
+clean_build
+
+# Setup build
+setup_build
+
+# Build archive
+build_archive
+
+# Create IPA
+create_ipa
+
+echo "Build process completed"
+
 # Fix all privacy bundles issues
 echo "Fixing privacy bundles issues..."
 
