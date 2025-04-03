@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../models/address.dart';
+import '../../services/address_service.dart'; // Import AddressService
 
 class AddressFormScreen extends StatefulWidget {
   final Address? address;
@@ -14,6 +15,7 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _streetController = TextEditingController();
+  final _apartmentController = TextEditingController();
   final _cityController = TextEditingController();
   final _postalCodeController = TextEditingController();
   final _phoneController = TextEditingController();
@@ -27,10 +29,11 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
     if (widget.address != null) {
       _nameController.text = widget.address!.name;
       _streetController.text = widget.address!.street;
+      _apartmentController.text = widget.address!.apartment;
       _cityController.text = widget.address!.city;
       _selectedEmirate = widget.address!.emirate;
-      _postalCodeController.text = widget.address!.postalCode;
-      _phoneController.text = widget.address!.phoneNumber;
+      _postalCodeController.text = widget.address!.pincode;
+      _phoneController.text = widget.address!.phone;
       _isDefault = widget.address!.isDefault;
     }
   }
@@ -39,6 +42,7 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
   void dispose() {
     _nameController.dispose();
     _streetController.dispose();
+    _apartmentController.dispose();
     _cityController.dispose();
     _postalCodeController.dispose();
     _phoneController.dispose();
@@ -54,15 +58,16 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
         id: widget.address?.id,
         name: _nameController.text,
         street: _streetController.text,
+        apartment: _apartmentController.text,
         city: _cityController.text,
         emirate: _selectedEmirate,
-        postalCode: _postalCodeController.text,
-        phoneNumber: _phoneController.text,
+        pincode: _postalCodeController.text,
+        phone: _phoneController.text,
         isDefault: _isDefault,
       );
 
-      // TODO: Implement address saving to API
-      await Future.delayed(const Duration(seconds: 1)); // Simulated API call
+      // Save address using AddressService
+      await AddressService().saveAddress(address);
 
       if (mounted) {
         Navigator.pop(context, true);
@@ -121,6 +126,20 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
               ),
               const SizedBox(height: 16),
               TextFormField(
+                controller: _apartmentController,
+                decoration: const InputDecoration(
+                  labelText: 'Apartment',
+                  border: OutlineInputBorder(),
+                ),
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Please enter the apartment';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
                 controller: _cityController,
                 decoration: const InputDecoration(
                   labelText: 'City',
@@ -164,15 +183,9 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
               TextFormField(
                 controller: _postalCodeController,
                 decoration: const InputDecoration(
-                  labelText: 'Postal Code',
+                  labelText: 'Pincode',
                   border: OutlineInputBorder(),
                 ),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter the postal code';
-                  }
-                  return null;
-                },
               ),
               const SizedBox(height: 16),
               TextFormField(
@@ -221,11 +234,14 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
                           width: 20,
                           child: CircularProgressIndicator(
                             strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                            valueColor:
+                                AlwaysStoppedAnimation<Color>(Colors.white),
                           ),
                         )
                       : Text(
-                          widget.address == null ? 'Add Address' : 'Save Changes',
+                          widget.address == null
+                              ? 'Add Address'
+                              : 'Save Changes',
                           style: const TextStyle(fontSize: 16),
                         ),
                 ),

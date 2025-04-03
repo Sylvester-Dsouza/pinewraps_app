@@ -204,5 +204,6 @@ class CartService extends ChangeNotifier {
   @override
   void dispose() {
     _cartCountNotifier.dispose();
+    super.dispose();
   }
 }

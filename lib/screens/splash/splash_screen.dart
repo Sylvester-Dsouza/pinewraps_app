@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import '../../main.dart';
-import '../auth/login_screen.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({Key? key}) : super(key: key);
@@ -10,7 +8,8 @@ class SplashScreen extends StatefulWidget {
   State<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderStateMixin {
+class _SplashScreenState extends State<SplashScreen>
+    with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _animation;
 
@@ -18,7 +17,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
   void initState() {
     super.initState();
     print("SplashScreen initState called");
-    
+
     _controller = AnimationController(
       duration: const Duration(seconds: 2),
       vsync: this,
@@ -46,12 +45,12 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
       print("Getting current user");
       final user = FirebaseAuth.instance.currentUser;
       print("Current user: ${user?.uid ?? 'null'}");
-      
+
       if (!mounted) {
         print("Widget not mounted, returning");
         return;
       }
-      
+
       if (user != null) {
         print("User is logged in, navigating to MainScreen");
         Navigator.pushReplacementNamed(context, '/home');

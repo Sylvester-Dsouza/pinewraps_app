@@ -15,12 +15,10 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   final _emailController = TextEditingController();
   final _authService = AuthService();
   bool _isLoading = false;
-  String? _errorMessage;
   bool _emailSent = false;
 
   void _showError(String message) {
     setState(() {
-      _errorMessage = message;
       _isLoading = false;
     });
 
@@ -46,7 +44,6 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
 
     setState(() {
       _isLoading = true;
-      _errorMessage = null;
     });
 
     try {
@@ -92,10 +89,9 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                 const SizedBox(height: 32),
                 TextFormField(
                   controller: _emailController,
-                  decoration: AuthStyles.inputDecoration('Email')
-                    .copyWith(
-                      prefixIcon: const Icon(Icons.email_outlined),
-                    ),
+                  decoration: AuthStyles.inputDecoration('Email').copyWith(
+                    prefixIcon: const Icon(Icons.email_outlined),
+                  ),
                   keyboardType: TextInputType.emailAddress,
                   textInputAction: TextInputAction.done,
                   onFieldSubmitted: (_) => _resetPassword(),
@@ -137,15 +133,17 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                     onPressed: _isLoading ? null : _resetPassword,
                     style: AuthStyles.elevatedButtonStyle,
                     child: _isLoading
-                      ? const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(
-                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                            strokeWidth: 2,
-                          ),
-                        )
-                      : Text('Send Reset Link', style: AuthStyles.buttonTextStyle),
+                        ? const SizedBox(
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(
+                              valueColor:
+                                  AlwaysStoppedAnimation<Color>(Colors.white),
+                              strokeWidth: 2,
+                            ),
+                          )
+                        : Text('Send Reset Link',
+                            style: AuthStyles.buttonTextStyle),
                   ),
                 const SizedBox(height: 24),
                 TextButton(

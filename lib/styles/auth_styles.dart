@@ -58,7 +58,14 @@ class AuthStyles {
   );
 
   static TextStyle subtitleStyle = const TextStyle(
-    fontSize: 16,
+    fontSize: 14,
     color: Colors.grey,
+  );
+
+  static TextStyle linkStyle = const TextStyle(
+    fontSize: 14,
+    color: Colors.black,
+    fontWeight: FontWeight.w600,
+    decoration: TextDecoration.underline,
   );
 }

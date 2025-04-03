@@ -78,7 +78,8 @@ class _CartScreenState extends State<CartScreen> {
                   context: context,
                   builder: (context) => AlertDialog(
                     title: const Text('Clear Cart'),
-                    content: const Text('Are you sure you want to clear your cart?'),
+                    content:
+                        const Text('Are you sure you want to clear your cart?'),
                     actions: [
                       TextButton(
                         onPressed: () => Navigator.pop(context),
@@ -140,7 +141,7 @@ class _CartScreenState extends State<CartScreen> {
                       color: Colors.white,
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.05),
+                          color: Colors.black.withAlpha(13),
                           blurRadius: 10,
                           offset: const Offset(0, -5),
                         ),
@@ -177,7 +178,8 @@ class _CartScreenState extends State<CartScreen> {
                                   ? () => _proceedToCheckout(context)
                                   : null,
                               style: ElevatedButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(vertical: 16),
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 16),
                               ),
                               child: const Text(
                                 'Proceed to Checkout',
@@ -210,11 +212,13 @@ class CartItemWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final hasSize = item.selectedSize != null && item.product.sizes.isNotEmpty;
-    final hasFlavour = item.selectedFlavour != null && item.product.flavours.isNotEmpty;
+    final hasFlavour =
+        item.selectedFlavour != null && item.product.flavours.isNotEmpty;
     final hasCakeText = item.cakeText != null && item.cakeText!.isNotEmpty;
-    final bool isVariantProduct = item.product.sizes.isNotEmpty || item.product.flavours.isNotEmpty;
-    final bool isSetWithFlavors = item.selectedOptions.containsKey('cakeFlavors');
-    final bool isSetCategory = item.product.category.name.toLowerCase() == 'sets';
+    final bool isVariantProduct =
+        item.product.sizes.isNotEmpty || item.product.flavours.isNotEmpty;
+    final bool isSetWithFlavors =
+        item.selectedOptions.containsKey('cakeFlavors');
 
     return Container(
       decoration: BoxDecoration(
@@ -222,7 +226,7 @@ class CartItemWidget extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withAlpha(13),
             blurRadius: 10,
             offset: const Offset(0, 2),
           ),
@@ -285,7 +289,9 @@ class CartItemWidget extends StatelessWidget {
                             ),
                           ),
                           const SizedBox(height: 4),
-                          ...(item.selectedOptions['cakeFlavors'] as List<dynamic>).map((flavor) {
+                          ...(item.selectedOptions['cakeFlavors']
+                                  as List<dynamic>)
+                              .map((flavor) {
                             return Padding(
                               padding: const EdgeInsets.only(bottom: 2),
                               child: Text(

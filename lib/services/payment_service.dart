@@ -1,23 +1,14 @@
 import 'dart:async';
 import 'package:dio/dio.dart';
-import '../config/environment.dart';
 import 'api_service.dart';
+import '../config/environment.dart';
 
 class PaymentService {
   final ApiService _apiService;
-  final String _apiUrl;
   final bool _useSandbox = true; // Set to true for sandbox testing
-  late final Dio _dio;
 
   PaymentService({ApiService? apiService}) 
-      : _apiService = apiService ?? ApiService(),
-        _apiUrl = EnvironmentConfig.apiBaseUrl {
-    _dio = Dio(BaseOptions(baseUrl: _apiUrl));
-  }
-
-  String get _nGeniusBaseUrl => _useSandbox 
-      ? 'https://api-gateway.sandbox.ngenius-payments.com'
-      : 'https://api-gateway.ngenius-payments.com';
+      : _apiService = apiService ?? ApiService();
 
   Future<Map<String, String>> createPaymentOrder({
     required String orderId,
@@ -80,23 +71,11 @@ class PaymentService {
       const maxRetries = 5;
       // Wait time between retries in seconds
       const retryDelay = 2;
+      bool callbackTriggered = false;
       
       for (int i = 0; i < maxRetries; i++) {
-        // First, trigger the callback to update payment status
-        try {
-          await _apiService.sendRequest(
-            '/payments/mobile-callback',
-            method: 'GET',
-            queryParameters: {
-              'ref': reference
-            },
-          );
-        } catch (e) {
-          print('Error triggering callback (attempt ${i + 1}): $e');
-          // Continue to status check even if callback fails
-        }
-
-        // Then check the payment status
+        // Check the payment status directly without triggering the callback
+        // This prevents duplicate reward points processing
         final response = await _apiService.sendRequest(
           '/payments/mobile/status/$reference',  
           method: 'GET',
@@ -112,6 +91,31 @@ class PaymentService {
           // Check if payment is captured
           if (paymentStatus == 'CAPTURED') {
             print('Payment captured successfully');
+            
+            // Only trigger the callback once per verification session
+            // and only if it hasn't been triggered yet
+            if (!callbackTriggered) {
+              callbackTriggered = true;
+              try {
+                // Use a direct API call instead of the sendRequest method
+                // to avoid any potential caching or retry mechanisms
+                final dio = Dio();
+                final baseUrl = EnvironmentConfig.apiBaseUrl;
+                await dio.get(
+                  '$baseUrl/payments/mobile-callback',
+                  queryParameters: {
+                    'ref': reference
+                  },
+                );
+                print('Successfully triggered payment callback after capture');
+              } catch (e) {
+                print('Error triggering callback after capture: $e');
+                // Continue even if callback fails, as the payment was successful
+              }
+            } else {
+              print('Callback already triggered, skipping to avoid duplicate reward points');
+            }
+            
             return true;
           }
           

@@ -1,13 +1,20 @@
 plugins {
     id "com.android.application"
     id "kotlin-android"
-    id "com.google.gms.google-services"
-    // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id "dev.flutter.flutter-gradle-plugin"
 }
 
+def localProperties = new Properties()
+def localPropertiesFile = rootProject.file('local.properties')
+if (localPropertiesFile.exists()) {
+    localPropertiesFile.withReader('UTF-8') { reader ->
+        localProperties.load(reader)
+    }
+}
+
+// Load key.properties file if it exists for signing
+def keystorePropertiesFile = rootProject.file("key.properties")
 def keystoreProperties = new Properties()
-def keystorePropertiesFile = rootProject.file('key.properties')
 if (keystorePropertiesFile.exists()) {
     keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
 }
@@ -26,27 +33,43 @@ android {
         jvmTarget = '17'
     }
 
+    sourceSets {
+        main.java.srcDirs += 'src/main/kotlin'
+    }
+
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
         applicationId "com.pinewraps.app"
-        // You can update the following values to match your application needs.
-        // For more information, see: https://flutter.dev/to/review-gradle-config.
-        minSdk 23  // Updated from 21 to 23 for Firebase Auth 5.x
+        minSdkVersion 23
         targetSdkVersion flutter.targetSdkVersion
-        versionCode flutter.versionCode
+        versionCode flutter.versionCode.toInteger()
         versionName flutter.versionName
     }
 
+    buildFeatures {
+        buildConfig true
+    }
+
     signingConfigs {
+        debug {
+            keyAlias 'androiddebugkey'
+            keyPassword 'android'
+            storeFile file('debug.keystore')
+            storePassword 'android'
+        }
         release {
-            keyAlias keystoreProperties['keyAlias']
-            keyPassword keystoreProperties['keyPassword']
-            storeFile file(keystoreProperties['storeFile'])
-            storePassword keystoreProperties['storePassword']
+            if (keystoreProperties.containsKey('keyAlias')) {
+                keyAlias keystoreProperties['keyAlias']
+                keyPassword keystoreProperties['keyPassword']
+                storeFile file(keystoreProperties['storeFile'])
+                storePassword keystoreProperties['storePassword']
+            }
         }
     }
 
     buildTypes {
+        debug {
+            signingConfig signingConfigs.debug
+        }
         release {
             signingConfig signingConfigs.release
             minifyEnabled true
@@ -61,10 +84,52 @@ flutter {
 
 dependencies {
     implementation platform('com.google.firebase:firebase-bom:32.7.0')
-    implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk7:$kotlin_version"
     implementation 'com.google.firebase:firebase-analytics'
     implementation 'com.google.firebase:firebase-auth'
     implementation 'com.google.android.gms:play-services-auth:20.7.0'
     implementation 'com.google.android.play:core-common:2.0.3'
     implementation 'com.google.android.play:app-update:2.1.0'
+}
+
+// This task runs after the build is complete and copies the APK to where Flutter expects it
+tasks.register('copyApkToFlutterDir') {
+    doLast {
+        def possibleSourceApks = [
+            "${buildDir}/outputs/flutter-apk/app-debug.apk",
+            "${buildDir}/outputs/apk/debug/app-debug.apk"
+        ]
+        def targetDir = "${rootProject.projectDir}/../build/app/outputs/flutter-apk/"
+        
+        // Create target directory if it doesn't exist
+        def targetDirFile = new File(targetDir)
+        if (!targetDirFile.exists()) {
+            targetDirFile.mkdirs()
+        }
+        
+        // Try to find and copy the APK file
+        boolean found = false
+        for (String sourceApk : possibleSourceApks) {
+            def sourceFile = new File(sourceApk)
+            if (sourceFile.exists()) {
+                copy {
+                    from sourceApk
+                    into targetDir
+                }
+                println "APK copied from ${sourceApk} to ${targetDir}"
+                found = true
+                break
+            }
+        }
+        
+        if (!found) {
+            println "Warning: Could not find source APK in any of the expected locations"
+        }
+    }
+}
+
+// Make sure the copy task runs after assembleDebug
+tasks.whenTaskAdded { task ->
+    if (task.name == 'assembleDebug') {
+        task.finalizedBy(tasks.named('copyApkToFlutterDir'))
+    }
 }

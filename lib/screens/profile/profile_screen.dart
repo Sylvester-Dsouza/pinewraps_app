@@ -18,14 +18,38 @@ class _ProfileScreenState extends State<ProfileScreen> {
   final _authService = AuthService();
   Map<String, dynamic>? _userProfile;
   bool _isLoading = false;
+  bool _isAuthenticated = false;
 
   @override
   void initState() {
     super.initState();
-    _loadUserProfile();
+    _checkAuthStatus();
+  }
+
+  Future<void> _checkAuthStatus() async {
+    final user = await _authService.getCurrentUser();
+    setState(() {
+      _isAuthenticated = user != null;
+    });
+
+    if (_isAuthenticated) {
+      _loadUserProfile();
+    } else {
+      // If not authenticated, navigate to login screen
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const LoginScreen()),
+        );
+      });
+    }
   }
 
   Future<void> _loadUserProfile() async {
+    if (!_isAuthenticated) {
+      return; // Don't try to load profile if not authenticated
+    }
+
     setState(() => _isLoading = true);
     try {
       final profile = await _authService.getUserProfile();
@@ -37,6 +61,39 @@ class _ProfileScreenState extends State<ProfileScreen> {
     } catch (e) {
       print('Error loading profile: $e');
       setState(() => _isLoading = false);
+
+      // Check for authentication errors
+      if (e.toString().toLowerCase().contains('log in') ||
+          e.toString().toLowerCase().contains('login') ||
+          e.toString().toLowerCase().contains('unauthorized') ||
+          e.toString().toLowerCase().contains('401') ||
+          e.toString().toLowerCase().contains('authentication')) {
+        print('Authentication error detected, redirecting to login screen');
+
+        // Clear any cached auth data
+        await _authService.clearAuthCache();
+
+        // Set state to not authenticated
+        setState(() {
+          _isAuthenticated = false;
+        });
+
+        // Redirect to login screen
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => const LoginScreen()),
+          );
+        });
+      } else {
+        // Show a general error message for other errors
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to load profile: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 
@@ -75,8 +132,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       )
                     else
                       Text(
-                        _userProfile != null && (_userProfile!['firstName'] != null || _userProfile!['lastName'] != null)
-                            ? '${_userProfile!['firstName'] ?? ''} ${_userProfile!['lastName'] ?? ''}'.trim()
+                        _userProfile != null &&
+                                (_userProfile!['firstName'] != null ||
+                                    _userProfile!['lastName'] != null)
+                            ? '${_userProfile!['firstName'] ?? ''} ${_userProfile!['lastName'] ?? ''}'
+                                .trim()
                             : 'Guest User',
                         style: const TextStyle(
                           fontSize: 18,
@@ -85,8 +145,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ),
                     const SizedBox(height: 4),
                     Text(
-                      _userProfile != null && _userProfile!['email'] != null 
-                          ? _userProfile!['email'] 
+                      _userProfile != null && _userProfile!['email'] != null
+                          ? _userProfile!['email']
                           : 'Welcome to Pinewraps',
                       style: const TextStyle(
                         color: Colors.grey,
@@ -115,7 +175,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               builder: (context) => const EditProfileScreen(),
             ),
           );
-          
+
           // Refresh profile data when returning from edit screen
           if (result == true) {
             _loadUserProfile();
@@ -131,28 +191,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ),
         child: const Text('Edit Profile'),
       ),
-    );
-  }
-
-  Widget _buildMenuItem({
-    required IconData icon,
-    required String title,
-    required VoidCallback onTap,
-    Color iconColor = Colors.black,
-    Widget? trailing,
-    bool showDivider = true,
-  }) {
-    return Column(
-      children: [
-        ListTile(
-          leading: Icon(icon, color: iconColor),
-          title: Text(title),
-          trailing: trailing ?? const Icon(Icons.chevron_right, color: Colors.grey),
-          onTap: onTap,
-        ),
-        if (showDivider)
-          const Divider(height: 1, indent: 70),
-      ],
     );
   }
 
@@ -249,8 +287,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
                 ListTile(
                   leading: const Icon(Icons.logout, color: Colors.red),
-                  title: const Text('Logout', style: TextStyle(color: Colors.red)),
-                  trailing: const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.red),
+                  title:
+                      const Text('Logout', style: TextStyle(color: Colors.red)),
+                  trailing: const Icon(Icons.arrow_forward_ios,
+                      size: 16, color: Colors.red),
                   onTap: () async {
                     // Show confirmation dialog
                     final shouldLogout = await showDialog<bool>(
@@ -290,7 +330,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         if (context.mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
-                              content: Text('Error logging out. Please try again.'),
+                              content:
+                                  Text('Error logging out. Please try again.'),
                               backgroundColor: Colors.red,
                             ),
                           );

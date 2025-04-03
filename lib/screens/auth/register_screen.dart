@@ -3,7 +3,6 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../../services/auth_service.dart';
 import '../../styles/auth_styles.dart';
 import '../../utils/toast_utils.dart';
-import '../main_screen.dart';
 import './login_screen.dart';
 
 class RegisterScreen extends StatefulWidget {
@@ -23,13 +22,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _confirmPasswordController = TextEditingController();
   final _authService = AuthService();
   bool _isLoading = false;
-  String? _errorMessage;
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
 
   void _showError(String message) {
     setState(() {
-      _errorMessage = message;
       _isLoading = false;
     });
 
@@ -45,23 +42,34 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
     setState(() {
       _isLoading = true;
-      _errorMessage = null;
     });
 
     try {
+      print('Starting registration process...');
+      print('Form data:');
+      print('Email: ${_emailController.text}');
+      print('First Name: ${_firstNameController.text}');
+      print('Last Name: ${_lastNameController.text}');
+      print('Phone: ${_phoneController.text}');
+      
       // Register the user
-      await _authService.registerWithEmailPassword(
-        email: _emailController.text,
+      final customerData = await _authService.registerWithEmailPassword(
+        email: _emailController.text.trim(),
         password: _passwordController.text,
-        firstName: _firstNameController.text,
-        lastName: _lastNameController.text,
-        phone: _phoneController.text,
+        firstName: _firstNameController.text.trim(),
+        lastName: _lastNameController.text.trim(),
+        phone: _phoneController.text.trim(),
       );
 
+      print('Registration successful: $customerData');
+
       if (mounted) {
-        _showSuccess('Registration successful! Please login to continue.');
+        // Sign out after registration to ensure clean login flow
+        await _authService.signOut();
         
-        // Navigate to login screen and remove all previous routes
+        _showSuccess('Registration successful! Please login to continue.');
+
+        // Navigate to login screen instead of main screen
         Navigator.of(context).pushAndRemoveUntil(
           MaterialPageRoute(
             builder: (context) => const LoginScreen(),
@@ -70,8 +78,34 @@ class _RegisterScreenState extends State<RegisterScreen> {
         );
       }
     } on FirebaseAuthException catch (e) {
-      _showError(e.message ?? 'Registration failed');
+      print('Firebase Auth Error: ${e.code} - ${e.message}');
+      String errorMessage = 'Registration failed';
+      
+      // Handle specific Firebase errors
+      switch (e.code) {
+        case 'email-already-in-use':
+          errorMessage = 'This email is already registered. Please login instead.';
+          break;
+        case 'invalid-email':
+          errorMessage = 'The email address is not valid.';
+          break;
+        case 'weak-password':
+          errorMessage = 'The password is too weak. Please use a stronger password.';
+          break;
+        default:
+          errorMessage = e.message ?? 'Registration failed';
+      }
+      
+      _showError(errorMessage);
+    } on Exception catch (e) {
+      print('API Error: $e');
+      if (e.toString().contains('Failed to register with backend')) {
+        _showError('Your account was created but we had trouble saving your profile. Please try logging in.');
+      } else {
+        _showError('An error occurred during registration: ${e.toString()}');
+      }
     } catch (e) {
+      print('Unexpected Error: $e');
       _showError('An unexpected error occurred during registration');
     } finally {
       if (mounted) {
@@ -132,10 +166,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     const SizedBox(height: 32),
                     TextFormField(
                       controller: _firstNameController,
-                      decoration: AuthStyles.inputDecoration('First Name *')
-                        .copyWith(
-                          prefixIcon: const Icon(Icons.person_outline),
-                        ),
+                      decoration:
+                          AuthStyles.inputDecoration('First Name *').copyWith(
+                        prefixIcon: const Icon(Icons.person_outline),
+                      ),
                       textInputAction: TextInputAction.next,
                       validator: (value) {
                         if (value == null || value.isEmpty) {
@@ -147,10 +181,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     const SizedBox(height: 16),
                     TextFormField(
                       controller: _lastNameController,
-                      decoration: AuthStyles.inputDecoration('Last Name *')
-                        .copyWith(
-                          prefixIcon: const Icon(Icons.person_outline),
-                        ),
+                      decoration:
+                          AuthStyles.inputDecoration('Last Name *').copyWith(
+                        prefixIcon: const Icon(Icons.person_outline),
+                      ),
                       textInputAction: TextInputAction.next,
                       validator: (value) {
                         if (value == null || value.isEmpty) {
@@ -162,10 +196,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     const SizedBox(height: 16),
                     TextFormField(
                       controller: _emailController,
-                      decoration: AuthStyles.inputDecoration('Email *')
-                        .copyWith(
-                          prefixIcon: const Icon(Icons.email_outlined),
-                        ),
+                      decoration:
+                          AuthStyles.inputDecoration('Email *').copyWith(
+                        prefixIcon: const Icon(Icons.email_outlined),
+                      ),
                       keyboardType: TextInputType.emailAddress,
                       textInputAction: TextInputAction.next,
                       validator: (value) {
@@ -181,15 +215,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     const SizedBox(height: 16),
                     TextFormField(
                       controller: _phoneController,
-                      decoration: AuthStyles.inputDecoration('Phone *')
-                        .copyWith(
-                          prefixIcon: const Icon(Icons.phone_outlined),
-                          prefixText: '+971 ',
-                          prefixStyle: const TextStyle(
-                            color: Colors.black,
-                            fontSize: 16,
-                          ),
+                      decoration:
+                          AuthStyles.inputDecoration('Phone *').copyWith(
+                        prefixIcon: const Icon(Icons.phone_outlined),
+                        prefixText: '+971 ',
+                        prefixStyle: const TextStyle(
+                          color: Colors.black,
+                          fontSize: 16,
                         ),
+                      ),
                       keyboardType: TextInputType.phone,
                       textInputAction: TextInputAction.next,
                       validator: (value) {
@@ -207,20 +241,22 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     const SizedBox(height: 16),
                     TextFormField(
                       controller: _passwordController,
-                      decoration: AuthStyles.inputDecoration('Password *')
-                        .copyWith(
-                          prefixIcon: const Icon(Icons.lock_outline),
-                          suffixIcon: IconButton(
-                            icon: Icon(
-                              _obscurePassword ? Icons.visibility_off : Icons.visibility,
-                            ),
-                            onPressed: () {
-                              setState(() {
-                                _obscurePassword = !_obscurePassword;
-                              });
-                            },
+                      decoration:
+                          AuthStyles.inputDecoration('Password *').copyWith(
+                        prefixIcon: const Icon(Icons.lock_outline),
+                        suffixIcon: IconButton(
+                          icon: Icon(
+                            _obscurePassword
+                                ? Icons.visibility_off
+                                : Icons.visibility,
                           ),
+                          onPressed: () {
+                            setState(() {
+                              _obscurePassword = !_obscurePassword;
+                            });
+                          },
                         ),
+                      ),
                       obscureText: _obscurePassword,
                       textInputAction: TextInputAction.next,
                       validator: (value) {
@@ -236,20 +272,24 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     const SizedBox(height: 16),
                     TextFormField(
                       controller: _confirmPasswordController,
-                      decoration: AuthStyles.inputDecoration('Confirm Password *')
-                        .copyWith(
-                          prefixIcon: const Icon(Icons.lock_outline),
-                          suffixIcon: IconButton(
-                            icon: Icon(
-                              _obscureConfirmPassword ? Icons.visibility_off : Icons.visibility,
-                            ),
-                            onPressed: () {
-                              setState(() {
-                                _obscureConfirmPassword = !_obscureConfirmPassword;
-                              });
-                            },
+                      decoration:
+                          AuthStyles.inputDecoration('Confirm Password *')
+                              .copyWith(
+                        prefixIcon: const Icon(Icons.lock_outline),
+                        suffixIcon: IconButton(
+                          icon: Icon(
+                            _obscureConfirmPassword
+                                ? Icons.visibility_off
+                                : Icons.visibility,
                           ),
+                          onPressed: () {
+                            setState(() {
+                              _obscureConfirmPassword =
+                                  !_obscureConfirmPassword;
+                            });
+                          },
                         ),
+                      ),
                       obscureText: _obscureConfirmPassword,
                       textInputAction: TextInputAction.done,
                       onFieldSubmitted: (_) => _register(),
@@ -275,7 +315,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                               width: 20,
                               child: CircularProgressIndicator(
                                 strokeWidth: 2,
-                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                valueColor:
+                                    AlwaysStoppedAnimation<Color>(Colors.white),
                               ),
                             )
                           : const Text('Register'),
@@ -287,7 +328,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
             ),
             if (_isLoading)
               Container(
-                color: Colors.black.withOpacity(0.1),
+                color: Colors.black.withAlpha(26),
                 child: const Center(
                   child: CircularProgressIndicator(),
                 ),

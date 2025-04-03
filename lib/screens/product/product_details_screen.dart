@@ -2,14 +2,19 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../models/product.dart';
 import '../../services/product_service.dart';
-import '../../models/cart_item.dart';
 import '../../services/cart_service.dart';
-import '../cart/cart_screen.dart';
 import '../../widgets/modern_notification.dart';
-import '../../main.dart';
 import 'package:html/parser.dart' as htmlparser;
 import 'package:html/dom.dart' as dom;
 import 'package:flutter_html/flutter_html.dart';
+
+// Extension method to capitalize the first letter of a string
+extension StringExtension on String {
+  String capitalize() {
+    if (isEmpty) return this;
+    return '${this[0].toUpperCase()}${substring(1).toLowerCase()}';
+  }
+}
 
 class ProductDetailsScreen extends StatefulWidget {
   final String productId;
@@ -33,7 +38,6 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
   String? _selectedSize;
   String? _selectedFlavour;
   int _cartItemCount = 0;
-  int _itemQuantity = 1;
   double _currentPrice = 0;
   final TextEditingController _cakeTextController = TextEditingController();
   final PageController _pageController = PageController();
@@ -48,7 +52,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
     _mounted = true;
     _loadProduct();
     _updateCartCount();
-    
+
     // Listen to cart changes
     _cartService.cartStream.listen((items) {
       if (_mounted) {
@@ -77,8 +81,12 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
 
   // Check if product is in Sets category
   bool get _isSetCategory {
-    return _product != null && 
-           _product!.category.name.toLowerCase() == 'sets';
+    if (_product == null) return false;
+
+    return _product!.categoryId.toLowerCase() == 'sets' ||
+        _product!.category.name.toLowerCase() == 'sets' ||
+        _product!.name.toLowerCase().contains('set of') ||
+        _product!.description.toLowerCase().contains('set of 4');
   }
 
   Future<void> _loadProduct() async {
@@ -98,12 +106,13 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
       print('Name: ${product.name}');
       print('Base Price: ${product.basePrice}');
       print('Has ${product.variations.length} variations');
-      print('Has ${product.flavours.length} flavours and ${product.sizes.length} sizes');
-      
+      print(
+          'Has ${product.flavours.length} flavours and ${product.sizes.length} sizes');
+
       if (product.flavours.isNotEmpty) {
         print('Available flavours: ${product.flavours.join(", ")}');
       }
-      
+
       if (product.sizes.isNotEmpty) {
         print('Available sizes: ${product.sizes.join(", ")}');
       }
@@ -111,49 +120,73 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
       // Setup initial selections from available options
       String? initialSize;
       String? initialFlavour;
-      
+
       // Get the first size option if available
       if (product.sizes.isNotEmpty) {
         initialSize = product.sizes.first;
       }
-      
+
       // Get the first flavour option if available
       if (product.flavours.isNotEmpty) {
         initialFlavour = product.flavours.first;
       }
-      
+
       // Calculate initial price based on selections
       double initialPrice = product.basePrice;
       if (initialSize != null || initialFlavour != null) {
-        initialPrice = product.getPriceForVariations(initialSize, initialFlavour);
+        initialPrice =
+            product.getPriceForVariations(initialSize, initialFlavour);
       }
-      
-      print('Initial setup - Size: $initialSize, Flavour: $initialFlavour, Price: $initialPrice');
+
+      print(
+          'Initial setup - Size: $initialSize, Flavour: $initialFlavour, Price: $initialPrice');
 
       setState(() {
         _product = product;
-        _selectedSize = initialSize; 
+        _selectedSize = initialSize;
         _selectedFlavour = initialFlavour;
         _currentPrice = initialPrice;
         _isLoading = false;
       });
 
       // Initialize cake flavors for Sets category
-      if (_isSetCategory && product.flavours.isNotEmpty) {
+      if (_isSetCategory) {
+        // Get all variations from the product
+        List<ProductVariation> availableVariations = _product!.variations;
+
+        // If no variations are available, don't show the UI
+        if (availableVariations.isEmpty) {
+          return;
+        }
+
+        // Try to get flavor variation first
+        ProductVariation? selectedVariation =
+            _product!.getVariationByType('FLAVOUR');
+
+        // If no flavor variation, use the first available variation
+        if (selectedVariation == null) {
+          selectedVariation = availableVariations.first;
+        }
+
+        List<ProductOption> variationOptions = selectedVariation.options;
+        String variationType = selectedVariation.type;
+
         // Initialize with default flavor for all 4 cakes
         List<Map<String, dynamic>> initialFlavors = [];
         for (int i = 1; i <= 4; i++) {
           initialFlavors.add({
             'cakeNumber': i,
-            'flavorId': product.flavours.isNotEmpty ? product.flavours.first : '',
+            'flavorId':
+                variationOptions.isNotEmpty ? variationOptions.first.value : '',
+            'variationType': variationType,
           });
         }
-        
+
         setState(() {
           _cakeFlavors = initialFlavors;
           _allCakeFlavorsSelected = true;
         });
-        
+
         // Recalculate price with flavors
         _updateCartPrice();
       }
@@ -181,101 +214,97 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
     print('Selected Size: $_selectedSize');
     print('Selected Flavour: $_selectedFlavour');
     print('Number of variations: ${_product!.variations.length}');
-    
+
     // For Sets category, calculate price based on selected cake flavors
     if (_isSetCategory) {
       double totalPrice = _product!.basePrice;
       print('Base price for set: $totalPrice');
-      
+
       // Add price adjustments for each cake flavor
       for (var flavor in _cakeFlavors) {
         String flavorId = flavor['flavorId'];
+        String variationType = flavor['variationType'] ?? 'FLAVOUR';
+
         if (flavorId.isNotEmpty) {
-          // Find the flavor in the product's flavours list
-          int flavorIndex = _product!.flavours.indexOf(flavorId);
-          if (flavorIndex >= 0 && _product!.variations.isNotEmpty) {
-            // Find the flavor variation
-            final flavorVariation = _product!.getVariationByType('FLAVOUR');
-            if (flavorVariation != null) {
-              // Find the option for this flavor
-              try {
-                final option = flavorVariation.options.firstWhere(
-                  (o) => o.value == flavorId,
-                );
-                if (option.priceAdjustment > 0) {
-                  print('Adding price for Cake ${flavor['cakeNumber']} flavor: ${option.priceAdjustment}');
-                  totalPrice += option.priceAdjustment;
-                }
-              } catch (e) {
-                print('Error finding flavor option: $e');
+          // Find the variation by type
+          final variation = _product!.getVariationByType(variationType);
+          if (variation != null) {
+            // Find the option for this flavor
+            try {
+              final option = variation.options.firstWhere(
+                (o) => o.value == flavorId,
+              );
+              if (option.priceAdjustment > 0) {
+                print(
+                    'Adding price for Cake ${flavor['cakeNumber']} ${variation.type}: ${option.priceAdjustment}');
+                totalPrice += option.priceAdjustment;
               }
+            } catch (e) {
+              print('Option not found for $flavorId: $e');
             }
           }
         }
       }
-      
-      print('Final set price: $totalPrice');
+
+      print('Total price for set: $totalPrice');
       return totalPrice;
     }
-    
-    // For regular products, use the existing method
-    final price = _product!.getPriceForVariations(_selectedSize, _selectedFlavour);
-    print('Calculated price: $price');
-    return price;
+
+    // For regular products, calculate price based on selected size and flavor
+    return _product!.getPriceForVariations(_selectedSize, _selectedFlavour);
   }
-  
+
   void _updateCartPrice() {
     if (_product == null) return;
-    
+
     setState(() {
       _currentPrice = _calculatePrice();
     });
-    
+
     print('Updated price: $_currentPrice');
   }
 
-  void _onSizeSelected(String size) {
-    setState(() {
-      _selectedSize = size;
-      _updateCartPrice();
-    });
-  }
+  void _onCakeFlavorSelected(
+      {required int cakeNumber, required String flavorId}) {
+    // Get the current variation type
+    String variationType = 'FLAVOUR';
+    if (_product != null && _product!.variations.isNotEmpty) {
+      ProductVariation? flavorVariation =
+          _product!.getVariationByType('FLAVOUR');
+      if (flavorVariation == null && _product!.variations.isNotEmpty) {
+        flavorVariation = _product!.variations.first;
+      }
+      if (flavorVariation != null) {
+        variationType = flavorVariation.type;
+      }
+    }
 
-  void _onFlavourSelected(String flavour) {
-    setState(() {
-      _selectedFlavour = flavour;
-      _updateCartPrice();
-    });
-  }
-
-  void _onCakeFlavorSelected(int cakeNumber, String flavorId) {
     final updatedFlavors = [..._cakeFlavors];
-    final existingIndex = updatedFlavors.indexWhere((f) => f['cakeNumber'] == cakeNumber);
-    
+    final existingIndex =
+        updatedFlavors.indexWhere((f) => f['cakeNumber'] == cakeNumber);
+
     if (existingIndex >= 0) {
       // Update existing flavor
       updatedFlavors[existingIndex]['flavorId'] = flavorId;
+      updatedFlavors[existingIndex]['variationType'] = variationType;
     } else {
       // Add new flavor
       updatedFlavors.add({
         'cakeNumber': cakeNumber,
         'flavorId': flavorId,
+        'variationType': variationType,
       });
     }
-    
+
     // Check if all flavors are selected
     bool allSelected = true;
-    for (int i = 1; i <= 4; i++) {
-      final flavor = updatedFlavors.firstWhere(
-        (f) => f['cakeNumber'] == i, 
-        orElse: () => {'cakeNumber': i, 'flavorId': ''}
-      );
-      if (flavor['flavorId'].isEmpty) {
+    for (var flavor in updatedFlavors) {
+      if (flavor['flavorId'] == null || flavor['flavorId'].isEmpty) {
         allSelected = false;
         break;
       }
     }
-    
+
     setState(() {
       _cakeFlavors = updatedFlavors;
       _allCakeFlavorsSelected = allSelected;
@@ -285,16 +314,14 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
 
   // Get the selected flavor for a specific cake
   String _getSelectedCakeFlavor(int cakeNumber) {
-    final flavor = _cakeFlavors.firstWhere(
-      (f) => f['cakeNumber'] == cakeNumber,
-      orElse: () => {'cakeNumber': cakeNumber, 'flavorId': ''}
-    );
+    final flavor = _cakeFlavors.firstWhere((f) => f['cakeNumber'] == cakeNumber,
+        orElse: () => {'cakeNumber': cakeNumber, 'flavorId': ''});
     return flavor['flavorId'];
   }
 
   Widget _buildSizeOption(String size) {
     final isSelected = _selectedSize == size;
-    
+
     return Padding(
       padding: const EdgeInsets.only(right: 12),
       child: InkWell(
@@ -330,7 +357,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
 
   Widget _buildFlavourOption(String flavour) {
     final isSelected = _selectedFlavour == flavour;
-    
+
     return Padding(
       padding: const EdgeInsets.only(right: 12),
       child: InkWell(
@@ -384,7 +411,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
             ));
             currentContent.clear();
           }
-          currentH3Section = node.text ?? '';
+          currentH3Section = node.text;
           insideH3Section = true;
         } else if (insideH3Section) {
           currentContent.writeln(node.outerHtml);
@@ -477,18 +504,38 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
     if (_product == null) {
       return const SizedBox.shrink();
     }
-    
+
     List<Widget> variantWidgets = [];
-    
+
     // For Sets category, show cake flavor selection
-    if (_isSetCategory && _product!.flavours.isNotEmpty) {
+    if (_isSetCategory) {
+      // Get all variations from the product
+      List<ProductVariation> availableVariations = _product!.variations;
+
+      // If no variations are available, don't show the UI
+      if (availableVariations.isEmpty) {
+        return const SizedBox.shrink();
+      }
+
+      // Try to get flavor variation first
+      ProductVariation? selectedVariation =
+          _product!.getVariationByType('FLAVOUR');
+
+      // If no flavor variation, use the first available variation
+      if (selectedVariation == null) {
+        selectedVariation = availableVariations.first;
+      }
+
+      List<ProductOption> variationOptions = selectedVariation.options;
+      String variationType = selectedVariation.type;
+
       variantWidgets.add(
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'Select Flavors for Each Cake',
-              style: TextStyle(
+            Text(
+              'Select ${variationType.capitalize()} for Each Cake',
+              style: const TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
               ),
@@ -502,7 +549,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Cake $cakeNumber Flavor',
+                        'Cake $cakeNumber ${variationType.capitalize()}',
                         style: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w500,
@@ -518,45 +565,22 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                           child: DropdownButton<String>(
                             value: _getSelectedCakeFlavor(cakeNumber),
                             isExpanded: true,
-                            hint: const Text('Select a flavor'),
+                            hint:
+                                Text('Select a ${variationType.toLowerCase()}'),
                             padding: const EdgeInsets.symmetric(horizontal: 12),
-                            items: _product!.flavours.map((flavor) {
-                              // Find the price adjustment for this flavor
-                              double priceAdjustment = 0;
-                              final flavorVariation = _product!.getVariationByType('FLAVOUR');
-                              if (flavorVariation != null) {
-                                try {
-                                  final option = flavorVariation.options.firstWhere(
-                                    (o) => o.value == flavor,
-                                  );
-                                  priceAdjustment = option.priceAdjustment;
-                                } catch (e) {
-                                  // Flavor not found in options
-                                }
-                              }
-                              
+                            items: variationOptions.map((option) {
                               return DropdownMenuItem<String>(
-                                value: flavor,
-                                child: Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Text(flavor),
-                                    if (priceAdjustment > 0 && !_isSetCategory)
-                                      Text(
-                                        '+${priceAdjustment.toStringAsFixed(0)} AED',
-                                        style: TextStyle(
-                                          color: Colors.grey[600],
-                                          fontWeight: FontWeight.w500,
-                                        ),
-                                      ),
-                                  ],
-                                ),
+                                value: option.value,
+                                child: Text(option.value),
                               );
                             }).toList(),
                             onChanged: (value) {
-                              if (value != null) {
-                                _onCakeFlavorSelected(cakeNumber, value);
-                              }
+                              if (value == null) return;
+
+                              _onCakeFlavorSelected(
+                                cakeNumber: cakeNumber,
+                                flavorId: value,
+                              );
                             },
                           ),
                         ),
@@ -579,7 +603,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
           ],
         ),
       );
-      
+
       // Show selected flavors summary
       if (_allCakeFlavorsSelected) {
         variantWidgets.add(
@@ -598,30 +622,25 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
                   color: Colors.white,
-                  border: Border.all(color: Colors.grey.shade200),
+                  border: Border.all(color: Colors.grey[200]!),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Column(
                   children: [
                     ..._cakeFlavors.map((flavor) {
-                      final flavorName = _product!.flavours.contains(flavor['flavorId']) 
-                          ? flavor['flavorId'] 
-                          : 'Not selected';
-                      
-                      // Find the price adjustment for this flavor
-                      double priceAdjustment = 0;
-                      final flavorVariation = _product!.getVariationByType('FLAVOUR');
-                      if (flavorVariation != null && flavor['flavorId'].isNotEmpty) {
-                        try {
-                          final option = flavorVariation.options.firstWhere(
-                            (o) => o.value == flavor['flavorId'],
-                          );
-                          priceAdjustment = option.priceAdjustment;
-                        } catch (e) {
-                          // Flavor not found in options
-                        }
-                      }
-                      
+                      final String flavorId = flavor['flavorId'];
+                      // Find the flavor option that matches the selected flavorId
+                      final flavorOption = variationOptions.firstWhere(
+                        (option) => option.value == flavorId,
+                        orElse: () => ProductOption(
+                            id: '',
+                            value: 'Not selected',
+                            priceAdjustment: 0,
+                            stock: 0),
+                      );
+
+                      final flavorName = flavorOption.value;
+
                       return Padding(
                         padding: const EdgeInsets.only(bottom: 8),
                         child: Row(
@@ -631,14 +650,6 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                               'Cake ${flavor['cakeNumber']}: $flavorName',
                               style: const TextStyle(fontSize: 14),
                             ),
-                            if (priceAdjustment > 0 && !_isSetCategory)
-                              Text(
-                                '+${priceAdjustment.toStringAsFixed(0)} AED',
-                                style: const TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
                           ],
                         ),
                       );
@@ -646,25 +657,25 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                     const Divider(),
                     // Only show base price if not in Sets category
                     if (!_isSetCategory)
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text(
-                          'Base Price:',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            'Base Price:',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
-                        ),
-                        Text(
-                          '${_product!.basePrice.toStringAsFixed(0)} AED',
-                          style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
+                          Text(
+                            '${_product!.basePrice.toStringAsFixed(0)} AED',
+                            style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
-                        ),
-                      ],
-                    ),
+                        ],
+                      ),
                   ],
                 ),
               ),
@@ -673,7 +684,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
           ),
         );
       }
-      
+
       // Return early for Sets category
       if (variantWidgets.isNotEmpty) {
         return Padding(
@@ -685,7 +696,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
         );
       }
     }
-    
+
     // Add size options if available
     if (_product!.sizes.isNotEmpty) {
       variantWidgets.add(
@@ -713,7 +724,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
         ),
       );
     }
-    
+
     // Add flavour options if available
     if (_product!.flavours.isNotEmpty) {
       variantWidgets.add(
@@ -741,12 +752,12 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
         ),
       );
     }
-    
+
     // Check if we have any variant options to display
     if (variantWidgets.isEmpty) {
       return const SizedBox.shrink();
     }
-    
+
     // Return the full widget with all variant options
     return Padding(
       padding: const EdgeInsets.only(top: 16),
@@ -829,11 +840,11 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
           left: 16,
           child: Container(
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.9),
+              color: Colors.white.withAlpha(230),
               borderRadius: BorderRadius.circular(12),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.1),
+                  color: Colors.black.withAlpha(26),
                   blurRadius: 8,
                   offset: const Offset(0, 2),
                 ),
@@ -867,7 +878,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                     shape: BoxShape.circle,
                     color: _currentImageIndex == index
                         ? Colors.white
-                        : Colors.white.withOpacity(0.5),
+                        : Colors.white.withAlpha(128),
                   ),
                 ),
               ),
@@ -880,61 +891,68 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
   Future<void> _addToCart() async {
     if (_product == null) return;
 
-    // For Sets category, ensure all cake flavors are selected
-    if (_isSetCategory && !_allCakeFlavorsSelected) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please select a flavor for each cake'),
-          duration: Duration(seconds: 2),
-        ),
-      );
-      return;
-    }
-
     // Get the cart service
     final cartService = Provider.of<CartService>(context, listen: false);
-    
+
     // Create a map of selected options
     Map<String, dynamic> selectedOptions = {};
-    
+
     // For Sets category, add cake flavors to selected options
     if (_isSetCategory) {
       List<Map<String, dynamic>> cakeFlavorsData = [];
+      String variationType = '';
+
       for (var flavor in _cakeFlavors) {
-        cakeFlavorsData.add({
-          'cakeNumber': flavor['cakeNumber'],
-          'flavor': flavor['flavorId'],
-        });
+        // Ensure the flavor has a valid ID
+        if (flavor['flavorId'] != null && flavor['flavorId'].isNotEmpty) {
+          variationType = flavor['variationType'] ?? 'FLAVOUR';
+          cakeFlavorsData.add({
+            'cakeNumber': flavor['cakeNumber'],
+            'flavor': flavor['flavorId'],
+            'variationType': variationType,
+          });
+        } else {
+          // If any flavor is missing, show an error
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                  'Please select a ${variationType.toLowerCase()} for each cake'),
+              duration: const Duration(seconds: 2),
+            ),
+          );
+          return;
+        }
       }
+      // Add cake flavors to selected options
       selectedOptions['cakeFlavors'] = cakeFlavorsData;
+      selectedOptions['variationType'] = variationType;
     } else {
       // For regular products, add size and flavor
       if (_selectedSize != null && _selectedSize!.isNotEmpty) {
         selectedOptions['size'] = _selectedSize;
       }
-      
+
       if (_selectedFlavour != null && _selectedFlavour!.isNotEmpty) {
         selectedOptions['flavour'] = _selectedFlavour;
       }
     }
-    
+
     // Add custom text if provided
     if (_cakeTextController.text.isNotEmpty) {
       selectedOptions['cakeText'] = _cakeTextController.text;
     }
-    
+
     try {
       // Add the product to the cart
       await cartService.addToCart(
         productId: _product!.id,
-        quantity: _itemQuantity,
+        quantity: 1,
         price: _currentPrice,
         selectedOptions: selectedOptions,
       );
-      
+
       // Show success message
       _showAddedToCartMessage();
-      
     } catch (e) {
       // Show error message
       ScaffoldMessenger.of(context).showSnackBar(
@@ -965,23 +983,9 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
 
   Future<void> _prefetchImages() async {
     if (_product == null || !mounted) return;
-    
+
     for (var image in _product!.images) {
       await precacheImage(NetworkImage(image.url), context);
-    }
-  }
-
-  void _incrementQuantity() {
-    setState(() {
-      _itemQuantity++;
-    });
-  }
-
-  void _decrementQuantity() {
-    if (_itemQuantity > 1) {
-      setState(() {
-        _itemQuantity--;
-      });
     }
   }
 
@@ -1007,24 +1011,28 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                               ),
                               boxShadow: [
                                 BoxShadow(
-                                  color: Colors.black.withOpacity(0.05),
+                                  color: Colors.black.withAlpha(13),
                                   blurRadius: 10,
                                   offset: const Offset(0, -5),
                                 ),
                               ],
                             ),
                             child: Padding(
-                              padding: const EdgeInsets.fromLTRB(16, 24, 16, 16),
+                              padding:
+                                  const EdgeInsets.fromLTRB(16, 24, 16, 16),
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       Expanded(
                                         child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
                                           children: [
                                             Text(
                                               _product!.name,
@@ -1051,8 +1059,10 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                                         padding: const EdgeInsets.all(8),
                                         decoration: BoxDecoration(
                                           color: Colors.white,
-                                          borderRadius: BorderRadius.circular(12),
-                                          border: Border.all(color: Colors.grey.shade300),
+                                          borderRadius:
+                                              BorderRadius.circular(12),
+                                          border: Border.all(
+                                              color: Colors.grey.shade300),
                                         ),
                                         child: Text(
                                           _product!.category.name,
@@ -1067,17 +1077,21 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                                   if (_product!.description.isNotEmpty) ...[
                                     const SizedBox(height: 20),
                                     ..._buildDescriptionWidgets(),
-                                    if (_product!.category.name.toLowerCase() == 'flowers') ...[
+                                    if (_product!.category.name.toLowerCase() ==
+                                        'flowers') ...[
                                       const SizedBox(height: 16),
                                       Container(
                                         padding: const EdgeInsets.all(12),
                                         decoration: BoxDecoration(
                                           color: Colors.white,
-                                          border: Border.all(color: Colors.grey[200]!),
-                                          borderRadius: BorderRadius.circular(8),
+                                          border: Border.all(
+                                              color: Colors.grey[200]!),
+                                          borderRadius:
+                                              BorderRadius.circular(8),
                                         ),
                                         child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
                                           children: [
                                             const Text(
                                               'Important Note:',
@@ -1103,7 +1117,10 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                                     const SizedBox(height: 24),
                                   ],
                                   _buildVariantOptions(),
-                                  if (_product!.category.name.toLowerCase() == 'cakes' || _product!.category.name.toLowerCase() == 'cake') ...[
+                                  if (_product!.category.name.toLowerCase() ==
+                                          'cakes' ||
+                                      _product!.category.name.toLowerCase() ==
+                                          'cake') ...[
                                     const Text(
                                       'Add Text on Cake',
                                       style: TextStyle(
@@ -1124,8 +1141,10 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                                       child: TextField(
                                         controller: _cakeTextController,
                                         decoration: InputDecoration(
-                                          hintText: 'Enter text to be written on cake',
-                                          contentPadding: const EdgeInsets.symmetric(
+                                          hintText:
+                                              'Enter text to be written on cake',
+                                          contentPadding:
+                                              const EdgeInsets.symmetric(
                                             horizontal: 16,
                                             vertical: 12,
                                           ),
@@ -1144,55 +1163,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                                     ),
                                     const SizedBox(height: 24),
                                   ],
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      Row(
-                                        children: [
-                                          GestureDetector(
-                                            onTap: _decrementQuantity,
-                                            child: Container(
-                                              padding: const EdgeInsets.all(8),
-                                              decoration: BoxDecoration(
-                                                color: Colors.white,
-                                                borderRadius: BorderRadius.circular(8),
-                                                border: Border.all(color: Colors.grey.shade300),
-                                              ),
-                                              child: const Icon(
-                                                Icons.remove,
-                                                size: 16,
-                                              ),
-                                            ),
-                                          ),
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(horizontal: 12),
-                                            child: Text(
-                                              _itemQuantity.toString(),
-                                              style: const TextStyle(
-                                                fontSize: 16,
-                                                fontWeight: FontWeight.bold,
-                                              ),
-                                            ),
-                                          ),
-                                          GestureDetector(
-                                            onTap: _incrementQuantity,
-                                            child: Container(
-                                              padding: const EdgeInsets.all(8),
-                                              decoration: BoxDecoration(
-                                                color: Colors.white,
-                                                borderRadius: BorderRadius.circular(8),
-                                                border: Border.all(color: Colors.grey.shade300),
-                                              ),
-                                              child: const Icon(
-                                                Icons.add,
-                                                size: 16,
-                                              ),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ],
-                                  ),
+                                  const SizedBox(height: 24),
                                 ],
                               ),
                             ),

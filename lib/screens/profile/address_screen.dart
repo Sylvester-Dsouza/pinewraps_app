@@ -17,7 +17,6 @@ class _AddressScreenState extends State<AddressScreen> {
   bool _isLoading = true;
   final Map<String, bool> _operationLoading = {};
   List<Address> _addresses = [];
-  Address? _addressesCache;
 
   @override
   void initState() {
@@ -66,7 +65,7 @@ class _AddressScreenState extends State<AddressScreen> {
     
     setState(() => _operationLoading[address.id!] = true);
     try {
-      final updatedAddress = await _apiService.setDefaultAddress(address.id!);
+      await _apiService.setDefaultAddress(address.id!);
       if (!mounted) return;
       setState(() {
         // Update all addresses to not default

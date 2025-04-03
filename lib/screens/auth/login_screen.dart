@@ -19,24 +19,25 @@ class _LoginScreenState extends State<LoginScreen> {
   final _passwordController = TextEditingController();
   final _authService = AuthService();
   bool _isLoading = false;
-  String? _errorMessage;
   bool _obscurePassword = true;
+  String? _errorMessage; // Used in _showError method
 
   void _showError(String message) {
     setState(() {
       _errorMessage = message;
-      _isLoading = false;
     });
-
+    
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
         backgroundColor: Colors.red,
+        duration: const Duration(seconds: 3),
       ),
     );
   }
 
   void _showSuccess(String message) {
+    // Used to display success messages to the user
     if (!mounted) return;
     
     ScaffoldMessenger.of(context).showSnackBar(
@@ -61,57 +62,65 @@ class _LoginScreenState extends State<LoginScreen> {
     });
 
     try {
+      print('Attempting to sign in with email: ${_emailController.text.trim()}');
+      
       // Attempt to sign in
-      await _authService.signInWithEmailPassword(
-        _emailController.text.trim(),
-        _passwordController.text,
+      final customerData = await _authService.signInWithEmailPassword(
+        email: _emailController.text.trim(),
+        password: _passwordController.text,
       );
+
+      print('Login successful: $customerData');
 
       // Make sure we have the latest auth state
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) {
         throw FirebaseAuthException(
           code: 'user-not-found',
-          message: 'Login failed. Please try again.',
+          message: 'No user found after login.',
         );
       }
 
       if (mounted) {
         _showSuccess('Login successful! Welcome back.');
         
-        // Wait a moment to show the success message
-        await Future.delayed(const Duration(milliseconds: 500));
-        
-        // Navigate to main screen and remove all previous routes
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (context) => const MainScreen()),
+        // Navigate to main screen
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(
+            builder: (context) => const MainScreen(),
+          ),
+          (route) => false,
         );
       }
     } on FirebaseAuthException catch (e) {
-      print('Firebase Auth Error: ${e.message}');
-      String errorMessage = 'An error occurred during login';
+      print('Firebase Auth Error: ${e.code} - ${e.message}');
+      String errorMessage = 'Authentication failed';
       
+      // Handle specific Firebase errors
       switch (e.code) {
         case 'user-not-found':
-          errorMessage = 'No user found with this email';
+          errorMessage = 'No user found with this email.';
           break;
         case 'wrong-password':
-          errorMessage = 'Invalid password';
+          errorMessage = 'Wrong password provided.';
           break;
         case 'invalid-email':
-          errorMessage = 'Invalid email address';
+          errorMessage = 'The email address is not valid.';
           break;
         case 'user-disabled':
-          errorMessage = 'This account has been disabled';
+          errorMessage = 'This user has been disabled.';
           break;
         default:
-          errorMessage = e.message ?? 'Login failed. Please try again.';
+          errorMessage = e.message ?? 'Authentication failed';
       }
       
       _showError(errorMessage);
+    } on ApiException catch (e) {
+      print('API Error: ${e.message} (${e.statusCode})');
+      _showError(e.message);
     } catch (e) {
-      print('Login Error: $e');
-      _showError('An unexpected error occurred. Please try again.');
+      print('Unexpected Error: $e');
+      _showError('An unexpected error occurred');
     } finally {
       if (mounted) {
         setState(() {
@@ -124,7 +133,6 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> _signInWithGoogle() async {
     setState(() {
       _isLoading = true;
-      _errorMessage = null;
     });
 
     try {
@@ -162,13 +170,7 @@ class _LoginScreenState extends State<LoginScreen> {
         }
 
         if (mounted) {
-          // Show success message
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Sign in successful!'),
-              backgroundColor: Colors.green,
-            ),
-          );
+          _showSuccess('Login successful! Welcome back.');
           
           // Navigate to main screen and remove all previous routes
           Navigator.of(context).pushReplacement(
@@ -237,7 +239,6 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> _signInWithApple() async {
     setState(() {
       _isLoading = true;
-      _errorMessage = null;
     });
 
     try {
@@ -245,6 +246,8 @@ class _LoginScreenState extends State<LoginScreen> {
       print('Apple sign in result: $result'); // Debug log
       
       if (mounted) {
+        _showSuccess('Login successful! Welcome back.');
+        
         // Navigate to main screen and remove all previous routes
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(builder: (context) => const MainScreen()),
@@ -265,6 +268,10 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      appBar: AppBar(
+        title: const Text('Login'),
+        backgroundColor: Colors.green,
+      ),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24.0),
@@ -273,12 +280,21 @@ class _LoginScreenState extends State<LoginScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // const SizedBox(height: 48),
-                // Image.asset(
-                //   'assets/images/logo.png',
-                //   height: 60,
-                //   fit: BoxFit.contain,
-                // ),
+                // Error message display
+                if (_errorMessage != null)
+                  Container(
+                    padding: const EdgeInsets.all(8.0),
+                    margin: const EdgeInsets.only(bottom: 16.0),
+                    decoration: BoxDecoration(
+                      color: Colors.red.shade100,
+                      borderRadius: BorderRadius.circular(4.0),
+                    ),
+                    child: Text(
+                      _errorMessage!,
+                      style: TextStyle(color: Colors.red.shade800),
+                    ),
+                  ),
+                
                 const SizedBox(height: 32),
                 Text(
                   'Welcome To PINEWRAPS',
@@ -377,7 +393,6 @@ class _LoginScreenState extends State<LoginScreen> {
                   label: Text('Continue with Google', style: AuthStyles.buttonTextStyle),
                 ),
                 const SizedBox(height: 16),
-                // Only show Apple Sign-In button on iOS
                 if (defaultTargetPlatform == TargetPlatform.iOS) ...[
                   OutlinedButton.icon(
                     onPressed: _isLoading ? null : _signInWithApple,
@@ -390,27 +405,23 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   const SizedBox(height: 16),
                 ],
-                OutlinedButton.icon(
-                  onPressed: null, // Disabled for now
-                  style: AuthStyles.outlinedButtonStyle,
-                  icon: Image.asset(
-                    'assets/images/facebook.png',
-                    height: 20,
-                  ),
-                  label: Text('Continue with Facebook', style: AuthStyles.buttonTextStyle),
-                ),
                 const SizedBox(height: 24),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Text("Don't have an account?"),
-                    TextButton(
-                      onPressed: () {
-                        Navigator.pushReplacementNamed(context, '/register');
-                      },
-                      child: const Text('Register'),
+                TextButton(
+                  onPressed: () {
+                    Navigator.pushNamed(context, '/register');
+                  },
+                  child: RichText(
+                    text: TextSpan(
+                      style: AuthStyles.subtitleStyle,
+                      children: [
+                        const TextSpan(text: "Don't have an account? "),
+                        TextSpan(
+                          text: 'Sign Up',
+                          style: AuthStyles.linkStyle,
+                        ),
+                      ],
                     ),
-                  ],
+                  ),
                 ),
                 TextButton(
                   onPressed: () {

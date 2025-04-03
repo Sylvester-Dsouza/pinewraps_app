@@ -313,7 +313,20 @@ class NotificationService {
 
   // Async alias for registerDeviceToken to match the method signature in AuthService
   Future<void> registerDeviceTokenAsync({required String email}) async {
-    return registerDeviceToken(email: email);
+    try {
+      return registerDeviceToken(email: email);
+    } catch (e) {
+      // Handle the PigeonUserDetails type cast error
+      if (e.toString().contains('PigeonUserDetails')) {
+        print('Caught PigeonUserDetails type cast error: $e');
+        print('This is likely due to a compatibility issue with the Firebase plugin');
+        // We can continue without registering the token for now
+        // The token will be registered on next app launch
+      } else {
+        // Rethrow other errors
+        rethrow;
+      }
+    }
   }
 
   // Unregister the device token from the backend

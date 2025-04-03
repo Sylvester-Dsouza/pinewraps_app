@@ -50,10 +50,11 @@ class _EditAddressScreenState extends State<EditAddressScreen> {
     setState(() => _isLoading = true);
     try {
       final address = Address(
+        name: 'Shipping Address',
         id: widget.address?.id,
         street: _streetController.text,
         apartment: _apartmentController.text,
-        emirate: _selectedEmirate!,
+        emirate: _selectedEmirate,
         city: _cityController.text,
         pincode: _pincodeController.text,
         isDefault: widget.address?.isDefault ?? false,

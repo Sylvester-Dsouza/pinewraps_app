@@ -37,7 +37,8 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
   }
 
   void _onScroll() {
-    if (_scrollController.position.pixels == _scrollController.position.maxScrollExtent) {
+    if (_scrollController.position.pixels ==
+        _scrollController.position.maxScrollExtent) {
       if (!_isLoading && _hasMore) {
         _loadMoreOrders();
       }
@@ -55,7 +56,7 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
     try {
       // Get current user email directly (no async needed now)
       String? email = _authService.getCurrentUserEmail();
-      
+
       // Try to get customer details if email isn't available from Firebase
       if (email == null || email.isEmpty) {
         try {
@@ -67,14 +68,14 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
           print('Error getting cached customer: $e');
         }
       }
-      
+
       // If still no email, redirect to login
       if (email == null || email.isEmpty) {
         setState(() {
           _error = 'Please login to view your orders';
           _isLoading = false;
         });
-        
+
         // Show a message to the user
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -82,28 +83,25 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
             duration: Duration(seconds: 3),
           ),
         );
-        
+
         // Optional: Navigate to login screen after a short delay
         Future.delayed(const Duration(seconds: 2), () {
           if (mounted) {
             Navigator.of(context).pushReplacementNamed('/login');
           }
         });
-        
+
         return;
       }
-      
+
       print('Fetching orders for email: $email');
-      
+
       // Use the new method to get all orders (online + POS)
       OrdersResponse orders;
       try {
         orders = await _apiService.getAllOrdersByEmail(
-          email: email,
-          page: _page, 
-          limit: _limit
-        );
-        
+            email: email, page: _page, limit: _limit);
+
         // Add more detailed logging
         print('Orders response received:');
         print('Total orders: ${orders.pagination.total}');
@@ -115,10 +113,10 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
         } else {
           print('No orders returned in results array');
         }
-        
+
         // Clear cache to force status refresh
         await _apiService.clearOrdersCache();
-        
+
         setState(() {
           _orders = orders.results;
           _hasMore = orders.pagination.total > _orders.length;
@@ -126,10 +124,11 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
         });
       } catch (e) {
         print('Error loading orders from API: $e');
-        
+
         // Show an appropriate error message based on the exception
-        String errorMessage = 'Could not load your orders. Please try again later.';
-        
+        String errorMessage =
+            'Could not load your orders. Please try again later.';
+
         if (e is ApiException) {
           if (e.statusCode == 401) {
             errorMessage = 'Please login to view your orders';
@@ -147,12 +146,12 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
             errorMessage = e.message;
           }
         }
-        
+
         setState(() {
           _error = errorMessage;
           _isLoading = false;
         });
-        
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(errorMessage),
@@ -179,7 +178,7 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
     try {
       // Get current user email directly (no async needed now)
       String? email = _authService.getCurrentUserEmail();
-      
+
       // Try to get customer details if email isn't available from Firebase
       if (email == null || email.isEmpty) {
         try {
@@ -190,7 +189,7 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
           print('Error getting cached customer: $e');
         }
       }
-      
+
       // If still no email, show error
       if (email == null || email.isEmpty) {
         setState(() {
@@ -199,17 +198,14 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
         });
         return;
       }
-      
+
       // Clear cache to force status refresh
       await _apiService.clearOrdersCache();
-      
+
       // Use the new method to get more orders (online + POS)
       final orders = await _apiService.getAllOrdersByEmail(
-        email: email,
-        page: _page + 1, 
-        limit: _limit
-      );
-      
+          email: email, page: _page + 1, limit: _limit);
+
       setState(() {
         _orders.addAll(orders.results);
         _page++;
@@ -222,12 +218,6 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
         _isLoading = false;
       });
     }
-  }
-
-  Future<void> _refreshOrders() async {
-    _page = 1;
-    _hasMore = true;
-    await _loadOrders();
   }
 
   Widget _buildErrorWidget() {
@@ -291,7 +281,7 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
             borderRadius: BorderRadius.circular(5),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.1),
+                color: Colors.black.withAlpha(26),
                 spreadRadius: 0,
                 blurRadius: 10,
                 offset: const Offset(0, 2),
@@ -392,7 +382,8 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
                               Navigator.push(
                                 context,
                                 MaterialPageRoute(
-                                  builder: (context) => OrderDetailsScreen(order: order),
+                                  builder: (context) =>
+                                      OrderDetailsScreen(order: order),
                                 ),
                               );
                             },

@@ -5,7 +5,7 @@ import '../../services/api_service.dart';
 import '../../services/payment_service.dart';
 import '../../models/address.dart';
 import '../../models/customer_details.dart';
-import '../../models/cart_item.dart';  // Added CartItem import
+import '../../models/cart_item.dart'; // Added CartItem import
 import 'dart:math'; // Added dart:math import for max/min functions
 import 'dart:convert'; // Added import for dart:convert
 import 'package:firebase_auth/firebase_auth.dart'; // Added import for Firebase Authentication
@@ -31,7 +31,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   final ApiService _apiService = ApiService();
   final PaymentService _paymentService = PaymentService();
   final _formKey = GlobalKey<FormState>();
-  
+
   // Form fields
   final _firstNameController = TextEditingController();
   final _lastNameController = TextEditingController();
@@ -47,17 +47,13 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   final _giftRecipientPhoneController = TextEditingController();
   final pointsController = TextEditingController();
   final _deliveryInstructionsController = TextEditingController();
-  
+
   // Read-only flags
   bool _firstNameReadOnly = false;
   bool _lastNameReadOnly = false;
   bool _emailReadOnly = false;
   bool _phoneReadOnly = false;
-  final bool _streetReadOnly = false;
-  final bool _apartmentReadOnly = false;
-  final bool _cityReadOnly = false;
-  final bool _pincodeReadOnly = false;
-  
+
   // UAE Emirates with proper formatting for both UI display and backend compatibility
   final List<String> _emirates = [
     'Abu Dhabi',
@@ -79,44 +75,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     'Ras Al Khaimah': 'RAS_AL_KHAIMAH',
     'Fujairah': 'FUJAIRAH',
   };
-  
+
   String? _selectedEmirate; // For UI display
   double _deliveryCharge = 0;
-  
-  // Define emirates list and their corresponding time slots
-  final Map<String, List<String>> _emirateTimeSlots = {
-    'Dubai': [
-      '10:00 AM - 12:00 PM',
-      '12:00 PM - 2:00 PM',
-      '2:00 PM - 4:00 PM',
-      '4:00 PM - 6:00 PM',
-      '6:00 PM - 8:00 PM',
-    ],
-    'Abu Dhabi': [
-      '10:00 AM - 2:00 PM',
-      '2:00 PM - 6:00 PM',
-    ],
-    'Sharjah': [
-      '10:00 AM - 2:00 PM',
-      '2:00 PM - 6:00 PM',
-    ],
-    'Ajman': [
-      '10:00 AM - 2:00 PM',
-      '2:00 PM - 6:00 PM',
-    ],
-    'Ras Al Khaimah': [
-      '10:00 AM - 2:00 PM',
-      '2:00 PM - 6:00 PM',
-    ],
-    'Fujairah': [
-      '10:00 AM - 2:00 PM',
-      '2:00 PM - 6:00 PM',
-    ],
-    'Umm Al Quwain': [
-      '10:00 AM - 2:00 PM',
-      '2:00 PM - 6:00 PM',
-    ]
-  };
 
   final List<String> _pickupTimeSlots = [
     '10:00 AM',
@@ -135,50 +96,82 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   final Map<String, List<Map<String, dynamic>>> _deliveryTimeSlots = {
     'Dubai': [
-      {'slot': '11am-1pm', 'cutoff': '20:00', 'nextDay': true},  // 8pm previous day
-      {'slot': '1pm-4pm', 'cutoff': '20:00', 'nextDay': true},   // 8pm previous day
-      {'slot': '4pm-7pm', 'cutoff': '11:00', 'nextDay': false},  // 11am same day
+      {
+        'slot': '11am-1pm',
+        'cutoff': '20:00',
+        'nextDay': true
+      }, // 8pm previous day
+      {
+        'slot': '1pm-4pm',
+        'cutoff': '20:00',
+        'nextDay': true
+      }, // 8pm previous day
+      {'slot': '4pm-7pm', 'cutoff': '11:00', 'nextDay': false}, // 11am same day
       {'slot': '7pm-10pm', 'cutoff': '16:00', 'nextDay': false}, // 4pm same day
     ],
     'Sharjah': [
-      {'slot': '4pm-9pm', 'cutoff': '11:00', 'nextDay': false},  // 11am same day
+      {'slot': '4pm-9pm', 'cutoff': '11:00', 'nextDay': false}, // 11am same day
     ],
     'Ajman': [
-      {'slot': '5pm-9:30pm', 'cutoff': '11:00', 'nextDay': false},  // 11am same day
+      {
+        'slot': '5pm-9:30pm',
+        'cutoff': '11:00',
+        'nextDay': false
+      }, // 11am same day
     ],
     'Abu Dhabi': [
-      {'slot': '5pm-9:30pm', 'cutoff': '11:00', 'nextDay': false},  // 11am same day
+      {
+        'slot': '5pm-9:30pm',
+        'cutoff': '11:00',
+        'nextDay': false
+      }, // 11am same day
     ],
     'Al Ain': [
-      {'slot': '4pm-10pm', 'cutoff': '20:00', 'nextDay': true},  // 8pm previous day
+      {
+        'slot': '4pm-10pm',
+        'cutoff': '20:00',
+        'nextDay': true
+      }, // 8pm previous day
     ],
     'Ras Al Khaimah': [
-      {'slot': '4pm-10pm', 'cutoff': '20:00', 'nextDay': true},  // 8pm previous day
+      {
+        'slot': '4pm-10pm',
+        'cutoff': '20:00',
+        'nextDay': true
+      }, // 8pm previous day
     ],
     'Umm Al Quwain': [
-      {'slot': '4pm-10pm', 'cutoff': '20:00', 'nextDay': true},  // 8pm previous day
+      {
+        'slot': '4pm-10pm',
+        'cutoff': '20:00',
+        'nextDay': true
+      }, // 8pm previous day
     ],
     'Fujairah': [
-      {'slot': '4pm-10pm', 'cutoff': '20:00', 'nextDay': true},  // 8pm previous day
+      {
+        'slot': '4pm-10pm',
+        'cutoff': '20:00',
+        'nextDay': true
+      }, // 8pm previous day
     ],
   };
 
   DeliveryMethod _selectedDeliveryMethod = DeliveryMethod.standardDelivery;
   DateTime? _selectedDate;
   String? _selectedTimeSlot;
-  bool _isGift = false;
   bool _isValidatingCoupon = false;
   String? _couponError;
   String? _appliedCouponCode;
   bool _isCouponApplied = false;
   double _couponDiscount = 0;
-  bool _isLoading = true;
+  bool _isLoading = false;
   List<Address> _savedAddresses = [];
   Address? _selectedAddress;
   CustomerDetails? _customerDetails;
   bool _isPointsRedeemed = false;
-  static const double POINTS_REDEMPTION_RATE = 1/4; // 4 points = 1 AED
+  static const double POINTS_REDEMPTION_RATE = 1 / 4; // 4 points = 1 AED
   double _total = 0;
+  bool _isGift = false;
 
   @override
   void initState() {
@@ -187,10 +180,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     _loadCustomerDetails();
     _phoneReadOnly = false; // Make phone number always editable
     _calculateTotal(); // Initialize total on startup
-    
+
     // Initialize emirate with a valid value from the _emirates list
     _selectedEmirate = _emirates[1]; // Dubai is at index 1
-    
+
     // Initialize recipient phone with UAE country code
     _giftRecipientPhoneController.text = '+971 ';
   }
@@ -226,46 +219,47 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     // Start with subtotal
     double total = _calculateSubTotal();
     print('Subtotal: $total');
-    
+
     // Apply coupon discount
     if (_isCouponApplied && _couponDiscount > 0) {
       total = max(0, total - _couponDiscount);
       print('After coupon discount: $total');
     }
-    
+
     // Apply points redemption
     if (_isPointsRedeemed) {
       final pointsDiscount = _calculatePointsDiscount();
       total = max(0, total - pointsDiscount);
       print('After points discount: $total');
     }
-    
+
     // Add delivery charge
     if (_selectedDeliveryMethod == DeliveryMethod.standardDelivery) {
       total += _deliveryCharge;
       print('After delivery charge: $total');
     }
-    
+
     // Update state
     setState(() {
       _total = max(0, total);
     });
-    
+
     print('Final total: $_total');
     return _total;
   }
 
   double _calculatePointsDiscount() {
     if (!_isPointsRedeemed || _customerDetails == null) return 0;
-    
+
     final pointsToRedeem = int.tryParse(pointsController.text) ?? 0;
     if (pointsToRedeem <= 0) return 0;
-    
+
     // Calculate points value (4 points = 1 AED)
     final pointsValue = pointsToRedeem * POINTS_REDEMPTION_RATE;
-    
+
     // Ensure points discount doesn't exceed remaining total after coupon
-    final remainingTotal = _calculateSubTotal() - (_isCouponApplied ? _couponDiscount : 0);
+    final remainingTotal =
+        _calculateSubTotal() - (_isCouponApplied ? _couponDiscount : 0);
     return min(pointsValue, remainingTotal);
   }
 
@@ -281,7 +275,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       }
 
       final customerData = response.data['data'];
-      
+
       setState(() {
         // Set customer details
         _customerDetails = CustomerDetails(
@@ -297,14 +291,16 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         _firstNameController.text = customerData['firstName'];
         _lastNameController.text = customerData['lastName'];
         _emailController.text = customerData['email'];
-        
+
         // Format phone number with UAE country code
         String phone = customerData['phone'] ?? '';
         if (!phone.startsWith('+971')) {
-          phone = phone.startsWith('0') ? '+971${phone.substring(1)}' : '+971$phone';
+          phone = phone.startsWith('0')
+              ? '+971${phone.substring(1)}'
+              : '+971$phone';
         }
         _phoneController.text = phone;
-        
+
         // Make fields read-only except phone
         _firstNameReadOnly = true;
         _lastNameReadOnly = true;
@@ -314,7 +310,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         // Set addresses
         _savedAddresses = (customerData['addresses'] as List)
             .map((addr) => Address(
-                  id: addr['id'],
+                  name: 'Billing Address',
                   street: addr['street'],
                   apartment: addr['apartment'] ?? '',
                   emirate: addr['emirate'],
@@ -338,9 +334,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     } catch (e) {
       print('Error loading customer details: $e');
       if (!mounted) return;
-      
+
       setState(() => _isLoading = false);
-      
+
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Failed to load customer details. Please try again.'),
@@ -354,14 +350,15 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     DateTime firstDate;
-    
+
     if (_selectedDeliveryMethod == DeliveryMethod.storePickup) {
       // For store pickup, allow same day with 3 hour buffer
       final currentHour = now.hour;
-      if (currentHour >= 21) {  // After 9 PM
-        firstDate = today.add(const Duration(days: 1));  // Start from tomorrow
+      if (currentHour >= 21) {
+        // After 9 PM
+        firstDate = today.add(const Duration(days: 1)); // Start from tomorrow
       } else {
-        firstDate = today;  // Start from today
+        firstDate = today; // Start from today
       }
     } else {
       // For delivery, start from tomorrow
@@ -397,7 +394,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     if (picked != null && mounted) {
       setState(() {
         _selectedDate = picked;
-        _selectedTimeSlot = null;  // Reset time slot when date changes
+        _selectedTimeSlot = null; // Reset time slot when date changes
       });
     }
   }
@@ -405,57 +402,59 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   List<String> _getAvailableTimeSlots() {
     final now = DateTime.now();
     final selectedDate = _selectedDate;
-    
+
     if (selectedDate == null) return [];
-    
-    final isToday = selectedDate.year == now.year && 
-                   selectedDate.month == now.month && 
-                   selectedDate.day == now.day;
-    
-    final isTomorrow = selectedDate.year == now.year && 
-                       selectedDate.month == now.month && 
-                       selectedDate.day == now.day + 1;
-    
+
+    final isToday = selectedDate.year == now.year &&
+        selectedDate.month == now.month &&
+        selectedDate.day == now.day;
+
+    final isTomorrow = selectedDate.year == now.year &&
+        selectedDate.month == now.month &&
+        selectedDate.day == now.day + 1;
+
     if (_selectedDeliveryMethod == DeliveryMethod.storePickup) {
       // For store pickup, use fixed time slots
-      
+
       // If not today, return all time slots
       if (!isToday) {
         return List.from(_pickupTimeSlots);
       }
-      
+
       // For same day pickup, filter slots based on current time + 3 hours buffer
       final currentHour = now.hour;
       return _pickupTimeSlots.where((slot) {
         final slotParts = slot.split(':');
-        int slotHour = int.parse(slotParts[0].trim());
+        int slotHour = int.tryParse(slotParts[0].trim()) ?? 0;
         final isPM = slot.toLowerCase().contains('pm');
-        
+
         // Convert to 24-hour format
         if (isPM && slotHour != 12) {
           slotHour += 12;
         } else if (!isPM && slotHour == 12) {
           slotHour = 0;
         }
-        
+
         // Slot is available if it's at least 3 hours from now
         return slotHour > (currentHour + 3);
       }).toList();
     } else {
       // For delivery, use emirate-specific slots
-      final currentEmirate = _selectedEmirate ?? _emirates[1]; // Default to Dubai
-      
+      final currentEmirate =
+          _selectedEmirate ?? _emirates[1]; // Default to Dubai
+
       // Find the matching key in _deliveryTimeSlots
       final emirateKey = _deliveryTimeSlots.keys.firstWhere(
         (key) => key.toUpperCase() == currentEmirate.toUpperCase(),
         orElse: () => _emirates[1], // Default to Dubai
       );
-      
+
       if (_deliveryTimeSlots[emirateKey] == null) return [];
 
       final currentHour = now.hour;
       final currentMinute = now.minute;
-      final currentTime = currentHour * 60 + currentMinute; // Convert to minutes
+      final currentTime =
+          currentHour * 60 + currentMinute; // Convert to minutes
 
       return _deliveryTimeSlots[emirateKey]!
           .where((slot) {
@@ -504,11 +503,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     });
 
     try {
-      final subtotal = _calculateSubTotal();  // Use subtotal for validation
+      final subtotal = _calculateSubTotal(); // Use subtotal for validation
       print('Validating coupon: $couponCode with subtotal: $subtotal');
       final response = await _apiService.validateCoupon(couponCode, subtotal);
       final data = response.data['data'];
-      
+
       if (data != null) {
         setState(() {
           _appliedCouponCode = couponCode;
@@ -555,18 +554,20 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   bool _validateGiftFields() {
     if (!_isGift) return true;
-    
+
     return _giftRecipientNameController.text.isNotEmpty &&
-           _giftRecipientPhoneController.text.isNotEmpty &&
-           RegExp(r'^\+971[0-9]{9}$').hasMatch(_giftRecipientPhoneController.text.replaceAll(RegExp(r'[\s\-()]'), '')) &&
-           _giftMessageController.text.isNotEmpty;
+        _giftRecipientPhoneController.text.isNotEmpty &&
+        RegExp(r'^\+971[0-9]{9}$').hasMatch(_giftRecipientPhoneController.text
+            .replaceAll(RegExp(r'[\s\-()]'), '')) &&
+        _giftMessageController.text.isNotEmpty;
   }
 
   Future<void> _placeOrder() async {
     try {
       // Step 1: Validate Form and Cart
       if (!_formKey.currentState!.validate() || !_validateGiftFields()) {
-        _showMessage('Please fill in all required fields correctly', isError: true);
+        _showMessage('Please fill in all required fields correctly',
+            isError: true);
         return;
       }
 
@@ -581,9 +582,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           return;
         }
 
-        if (_streetController.text.trim().isEmpty || 
+        if (_streetController.text.trim().isEmpty ||
             _cityController.text.trim().isEmpty) {
-          _showMessage('Please provide complete delivery address', isError: true);
+          _showMessage('Please provide complete delivery address',
+              isError: true);
           return;
         }
       }
@@ -597,12 +599,14 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       if (_isPointsRedeemed) {
         final points = int.tryParse(pointsController.text);
         if (points == null || points <= 0) {
-          _showMessage('Please enter a valid number of points to redeem', isError: true);
+          _showMessage('Please enter a valid number of points to redeem',
+              isError: true);
           return;
         }
 
         if (points > _customerDetails!.rewardPoints) {
-          _showMessage('You cannot redeem more points than you have available', isError: true);
+          _showMessage('You cannot redeem more points than you have available',
+              isError: true);
           return;
         }
       }
@@ -613,95 +617,65 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       final orderData = _buildOrderData();
       print('Sending order data: ${json.encode(orderData)}');
 
-      final response = await _apiService.sendRequest(
-        '/orders',
-        method: 'POST',
-        data: orderData,
-      );
+      final response = await _apiService.createOrder(orderData);
 
-      print('API Response: ${json.encode(response.data)}');
+      print('API Response: ${json.encode(response)}');
 
       // Step 5: Handle Response
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        print('Success response data: ${json.encode(response.data)}');
-        
-        if (response.data == null) {
-          throw Exception('Empty response from server');
-        }
-        
-        String? orderId;
-        String? paymentUrl;
-        
-        // Extract data from response using different possible paths
-        if (response.data['data'] != null) {
-          var data = response.data['data'];
-          
-          // Check for order in data
-          if (data['order'] != null && data['order'] is Map) {
-            orderId = data['order']['id']?.toString();
-          }
-          // Check for direct id in data
-          else if (data['id'] != null) {
-            orderId = data['id'].toString();
-          }
-          
-          // Check for payment URL in data
-          if (data['paymentUrl'] != null) {
-            paymentUrl = data['paymentUrl'].toString();
-          }
-        }
-        // Check for direct order in response
-        else if (response.data['order'] != null && response.data['order'] is Map) {
-          orderId = response.data['order']['id']?.toString();
-        }
-        // Check for direct id in response
-        else if (response.data['id'] != null) {
-          orderId = response.data['id'].toString();
-        }
-        
-        // Check for payment URL directly in response
-        if (paymentUrl == null && response.data['paymentUrl'] != null) {
-          paymentUrl = response.data['paymentUrl'].toString();
-        }
-        
-        print('Extracted order ID: $orderId');
-        print('Extracted payment URL: $paymentUrl');
-        
-        // If we have a payment URL but no order ID, use the payment URL directly
-        if ((orderId == null || orderId.isEmpty) && paymentUrl != null && paymentUrl.isNotEmpty) {
-          print('Using payment URL directly: $paymentUrl');
-          await _navigateToPaymentWebView(paymentUrl);
-          return;
-        }
-        
-        // If we have an order ID, process payment
-        if (orderId != null && orderId.isNotEmpty) {
-          await _processPayment(orderId);
-          return;
-        }
-        
-        throw Exception('Could not extract order ID or payment URL from response: ${json.encode(response.data)}');
-      } else {
-        throw Exception(response.data['error']?.toString() ?? 
-                       response.data['message']?.toString() ?? 
-                       'Failed to create order');
+      print('Success response data: ${json.encode(response)}');
+
+      String? orderId;
+      String? paymentUrl;
+
+      // Extract data from response
+      if (response.containsKey('order') && response['order'] is Map) {
+        orderId = response['order']['id'].toString();
+      } else if (response.containsKey('id')) {
+        orderId = response['id'].toString();
       }
+
+      if (response.containsKey('paymentUrl')) {
+        paymentUrl = response['paymentUrl'].toString();
+      }
+
+      print('Extracted order ID: $orderId');
+      print('Extracted payment URL: $paymentUrl');
+
+      // If we have a payment URL but no order ID, use the payment URL directly
+      if ((orderId == null || orderId.isEmpty) &&
+          paymentUrl != null &&
+          paymentUrl.isNotEmpty) {
+        print('Using payment URL directly: $paymentUrl');
+        await _navigateToPaymentWebView(paymentUrl);
+        return;
+      }
+
+      // If we have an order ID, process payment
+      if (orderId != null && orderId.isNotEmpty) {
+        await _processPayment(orderId);
+        return;
+      }
+
+      throw Exception(
+          'Could not extract order ID or payment URL from response: ${json.encode(response)}');
     } catch (e) {
       print('Error placing order: $e');
       setState(() => _isLoading = false);
-      
+
       String errorMessage = 'Failed to place order. ';
       if (e.toString().contains('Authentication error')) {
         errorMessage += 'Please log in again.';
       } else if (e.toString().contains('Validation error')) {
         errorMessage += 'Please check your input.';
       } else if (e.toString().contains('Server error')) {
-        errorMessage += e.toString().split('Server error:')[1] ?? 
-                       'Please try again later or contact support.';
+        final parts = e.toString().split('Server error:');
+        errorMessage += parts.length > 1
+            ? parts[1]
+            : 'Please try again later or contact support.';
       } else {
         errorMessage += e.toString();
       }
-      
+
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -740,6 +714,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               if (success) {
                 // Clear cart and show success message
                 _cartService.clearCart();
+
                 Navigator.pushNamedAndRemoveUntil(
                   context,
                   '/orders',
@@ -776,16 +751,18 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           backgroundColor: Colors.red,
         ),
       );
+    } finally {
+      setState(() => _isLoading = false);
     }
   }
 
   Future<void> _navigateToPaymentWebView(String paymentUrl) async {
     try {
       if (!mounted) return;
-      
+
       // Generate a unique reference for this payment
       final reference = 'direct_${DateTime.now().millisecondsSinceEpoch}';
-      
+
       final paymentResult = await Navigator.push<bool>(
         context,
         MaterialPageRoute(
@@ -797,6 +774,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               if (success) {
                 // Clear cart and show success message
                 _cartService.clearCart();
+
                 Navigator.pushNamedAndRemoveUntil(
                   context,
                   '/orders',
@@ -833,6 +811,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           backgroundColor: Colors.red,
         ),
       );
+    } finally {
       setState(() => _isLoading = false);
     }
   }
@@ -844,29 +823,32 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     // Format time slot to 24-hour format
     String formatTimeSlot(String? timeSlot) {
       if (timeSlot == null) return '';
-      
+
       // Parse the time slot (e.g., "5:00 PM")
       final parts = timeSlot.split(' ');
       if (parts.length != 2) return timeSlot;
-      
+
       final timeParts = parts[0].split(':');
       if (timeParts.length != 2) return timeSlot;
-      
+
       int hour = int.tryParse(timeParts[0]) ?? 0;
       final minutes = timeParts[1];
       final isPM = parts[1].toUpperCase() == 'PM';
-      
+
+      // Convert to 24-hour format
       if (isPM && hour != 12) hour += 12;
       if (!isPM && hour == 12) hour = 0;
-      
+
       return '${hour.toString().padLeft(2, '0')}:$minutes';
     }
 
     // Calculate delivery charge based on emirate
-    final isDelivery = _selectedDeliveryMethod == DeliveryMethod.standardDelivery;
+    final isDelivery =
+        _selectedDeliveryMethod == DeliveryMethod.standardDelivery;
     final selectedEmirate = _selectedEmirate;
-    final deliveryCharge = isDelivery ? 
-        (_backendEmirates[selectedEmirate] == 'DUBAI' ? 30 : 50) : 0;
+    final deliveryCharge = isDelivery
+        ? (_backendEmirates[selectedEmirate] == 'DUBAI' ? 30 : 50)
+        : 0;
 
     return {
       'firstName': _firstNameController.text.trim(),
@@ -874,35 +856,48 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       'email': _emailController.text.trim(),
       'phone': _phoneController.text.trim(),
       'idempotencyKey': DateTime.now().millisecondsSinceEpoch.toString(),
-      'deliveryMethod': _selectedDeliveryMethod == DeliveryMethod.storePickup ? 'PICKUP' : 'DELIVERY',
-      'items': widget.cartItems.map((item) => {
-        'name': item.product.name,
-        'variant': ((item.selectedSize?.isNotEmpty == true ? item.selectedSize : 
-                  item.selectedFlavour?.isNotEmpty == true ? item.selectedFlavour : '') ?? '')
-                  .toUpperCase(),
-        'price': item.totalPrice.floor(),
-        'quantity': item.quantity,
-        'cakeWriting': item.cakeText ?? '',
-      }).toList(),
+      'deliveryMethod': _selectedDeliveryMethod == DeliveryMethod.storePickup
+          ? 'PICKUP'
+          : 'DELIVERY',
+      'items': widget.cartItems
+          .map((item) => {
+                'name': item.product.name,
+                'variant': ((item.selectedSize?.isNotEmpty == true
+                            ? item.selectedSize
+                            : item.selectedFlavour?.isNotEmpty == true
+                                ? item.selectedFlavour
+                                : '') ??
+                        '')
+                    .toUpperCase(),
+                'price': item.totalPrice.floor(),
+                'quantity': item.quantity,
+                'cakeWriting': item.cakeText ?? '',
+              })
+          .toList(),
       'subtotal': subtotal.floor(),
       'total': total.floor(),
       'paymentMethod': 'CREDIT_CARD',
       'isGift': _isGift,
-      'emirate': _selectedEmirate != null ? _backendEmirates[_selectedEmirate] : null, // Always include emirate
+      'emirate': _selectedEmirate != null
+          ? _backendEmirates[_selectedEmirate]
+          : null, // Always include emirate
       'deliveryCharge': deliveryCharge, // Always include deliveryCharge
       if (_isGift) ...{
         'giftMessage': _giftMessageController.text.trim(),
         'giftRecipientName': _giftRecipientNameController.text.trim(),
         'giftRecipientPhone': _giftRecipientPhoneController.text.trim(),
       },
-      'pointsRedeemed': _isPointsRedeemed ? int.tryParse(pointsController.text) ?? 0 : 0,
+      'pointsRedeemed':
+          _isPointsRedeemed ? int.tryParse(pointsController.text) ?? 0 : 0,
       if (_selectedDeliveryMethod == DeliveryMethod.standardDelivery) ...{
         'streetAddress': _streetController.text.trim(),
         'apartment': _apartmentController.text.trim(),
         'city': _cityController.text.trim(),
         'pincode': _pincodeController.text.trim(),
         'deliveryDate': _selectedDate?.toIso8601String().split('T')[0],
-        'deliveryTimeSlot': _selectedTimeSlot != null ? formatTimeSlot(_selectedTimeSlot) : null,
+        'deliveryTimeSlot': _selectedTimeSlot != null
+            ? formatTimeSlot(_selectedTimeSlot)
+            : null,
         'deliveryInstructions': _deliveryInstructionsController.text.trim(),
       } else ...{
         'streetAddress': '', // Add empty strings for required fields
@@ -910,10 +905,13 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         'city': '',
         'pincode': '',
         'pickupDate': _selectedDate?.toIso8601String().split('T')[0],
-        'pickupTimeSlot': _selectedTimeSlot != null ? formatTimeSlot(_selectedTimeSlot) : null,
+        'pickupTimeSlot': _selectedTimeSlot != null
+            ? formatTimeSlot(_selectedTimeSlot)
+            : null,
         'storeLocation': 'Dubai Main Store',
       },
-      if (_couponController.text.isNotEmpty) 'couponCode': _couponController.text,
+      if (_couponController.text.isNotEmpty)
+        'couponCode': _couponController.text,
     };
   }
 
@@ -962,7 +960,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   const SizedBox(height: 24),
                   _buildDeliveryOptions(),
                   const SizedBox(height: 24),
-                  if (_selectedDeliveryMethod == DeliveryMethod.standardDelivery) ...[
+                  if (_selectedDeliveryMethod ==
+                      DeliveryMethod.standardDelivery) ...[
                     _buildShippingForm(),
                     const SizedBox(height: 24),
                   ],
@@ -1092,7 +1091,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               return 'Phone number is required';
             }
             // Validate UAE phone number format
-            if (!RegExp(r'^\+971[0-9]{9}$').hasMatch(value.replaceAll(RegExp(r'[\s\-()]'), ''))) {
+            if (!RegExp(r'^\+971[0-9]{9}$')
+                .hasMatch(value.replaceAll(RegExp(r'[\s\-()]'), ''))) {
               return 'Please enter a valid UAE phone number (+971XXXXXXXXX)';
             }
             return null;
@@ -1188,7 +1188,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         borderRadius: BorderRadius.circular(12),
         onTap: () => setState(() {
           _selectedDeliveryMethod = method;
-          _selectedTimeSlot = null;  // Reset time slot when delivery method changes
+          _selectedTimeSlot =
+              null; // Reset time slot when delivery method changes
         }),
         child: Container(
           padding: const EdgeInsets.all(16),
@@ -1212,7 +1213,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                       title,
                       style: TextStyle(
                         fontSize: 16,
-                        fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                        fontWeight:
+                            isSelected ? FontWeight.w600 : FontWeight.w500,
                         color: isSelected ? Colors.black87 : Colors.grey[800],
                       ),
                     ),
@@ -1232,7 +1234,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 groupValue: _selectedDeliveryMethod,
                 onChanged: (value) => setState(() {
                   _selectedDeliveryMethod = value!;
-                  _selectedTimeSlot = null;  // Reset time slot when delivery method changes
+                  _selectedTimeSlot =
+                      null; // Reset time slot when delivery method changes
                 }),
                 activeColor: Colors.black87,
               ),
@@ -1255,8 +1258,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         _buildTextField(
           controller: _streetController,
           label: 'Street Address',
-          validator: (value) =>
-              value?.isEmpty ?? true ? 'Please enter your street address' : null,
+          validator: (value) => value?.isEmpty ?? true
+              ? 'Please enter your street address'
+              : null,
         ),
         const SizedBox(height: 16),
         _buildTextField(
@@ -1285,7 +1289,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           }).toList(),
           onChanged: (value) {
             setState(() {
-              _selectedEmirate = value ?? _emirates.first; // Use the exact value from the list
+              _selectedEmirate =
+                  value ?? _emirates.first; // Use the exact value from the list
               _updateDeliveryCharge();
             });
           },
@@ -1313,28 +1318,28 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   void _updateShippingFields(Address address) {
     _streetController.text = address.street;
-    _apartmentController.text = address.apartment ?? '';
+    _apartmentController.text = address.apartment;
     _cityController.text = address.city;
-    
+
     // Set selected emirate by finding matching value in _emirates list
     final addressEmirate = address.emirate;
     // Find the UI display emirate that matches the backend format
     String? displayEmirate;
     for (var entry in _backendEmirates.entries) {
-      if (entry.value == addressEmirate || 
+      if (entry.value == addressEmirate ||
           entry.value.toUpperCase() == addressEmirate.toUpperCase()) {
         displayEmirate = entry.key;
         break;
       }
     }
-    
+
     if (displayEmirate != null && _emirates.contains(displayEmirate)) {
       _selectedEmirate = displayEmirate;
     } else {
       _selectedEmirate = 'Dubai'; // Default to Dubai
     }
-      
-    _pincodeController.text = address.pincode ?? '';
+
+    _pincodeController.text = address.pincode;
   }
 
   void _updateDeliveryCharge() {
@@ -1344,7 +1349,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       setState(() {
         if (selectedEmirate == null) {
           _deliveryCharge = 30; // Default to Dubai charge
-        } else if (_backendEmirates[selectedEmirate] == 'DUBAI') { // Use display name
+        } else if (_backendEmirates[selectedEmirate] == 'DUBAI') {
+          // Use display name
           _deliveryCharge = 30;
         } else {
           _deliveryCharge = 50;
@@ -1361,11 +1367,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   Widget _buildTimeSlotSelector() {
     List<String> timeSlots = _getAvailableTimeSlots();
-    
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (_selectedDeliveryMethod == DeliveryMethod.standardDelivery && _selectedEmirate != null)
+        if (_selectedDeliveryMethod == DeliveryMethod.standardDelivery &&
+            _selectedEmirate != null)
           Padding(
             padding: const EdgeInsets.only(bottom: 16),
             child: Container(
@@ -1410,9 +1417,13 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                           : 'Select Delivery Date'
                       : getFormattedDate(),
                   style: TextStyle(
-                    color: _selectedDate == null ? Colors.grey[600] : Colors.grey[800],
+                    color: _selectedDate == null
+                        ? Colors.grey[600]
+                        : Colors.grey[800],
                     fontSize: 16,
-                    fontWeight: _selectedDate == null ? FontWeight.normal : FontWeight.w500,
+                    fontWeight: _selectedDate == null
+                        ? FontWeight.normal
+                        : FontWeight.w500,
                   ),
                 ),
                 Icon(
@@ -1455,25 +1466,31 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               borderRadius: BorderRadius.circular(12),
               borderSide: const BorderSide(color: Colors.black87),
             ),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
           ),
-          items: timeSlots.map((slot) => DropdownMenuItem(
-            value: slot,
-            child: Text(
-              slot,
-              style: TextStyle(color: Colors.grey[800]),
-            ),
-          )).toList(),
-          onChanged: timeSlots.isEmpty ? null : (value) {
-            setState(() => _selectedTimeSlot = value);
-          },
-          validator: (value) => value == null ? 'Please select a time slot' : null,
+          items: timeSlots
+              .map((slot) => DropdownMenuItem(
+                    value: slot,
+                    child: Text(
+                      slot,
+                      style: TextStyle(color: Colors.grey[800]),
+                    ),
+                  ))
+              .toList(),
+          onChanged: timeSlots.isEmpty
+              ? null
+              : (value) {
+                  setState(() => _selectedTimeSlot = value);
+                },
+          validator: (value) =>
+              value == null ? 'Please select a time slot' : null,
           hint: Text(
             timeSlots.isEmpty
-              ? _selectedDate == null
-                  ? 'Select a date first'
-                  : 'No time slots available'
-              : 'Select a time slot',
+                ? _selectedDate == null
+                    ? 'Select a date first'
+                    : 'No time slots available'
+                : 'Select a time slot',
             style: TextStyle(color: Colors.grey[600]),
           ),
           icon: Icon(Icons.access_time, color: Colors.grey[700]),
@@ -1535,8 +1552,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 _buildTextField(
                   controller: _giftRecipientNameController,
                   label: "Recipient's Name",
-                  validator: (value) =>
-                      value?.isEmpty ?? true ? "Please enter recipient's name" : null,
+                  validator: (value) => value?.isEmpty ?? true
+                      ? "Please enter recipient's name"
+                      : null,
                 ),
                 const SizedBox(height: 16),
                 _buildTextField(
@@ -1548,7 +1566,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                       return "Please enter recipient's phone number";
                     }
                     // Clean the phone number
-                    final cleanPhone = value.replaceAll(RegExp(r'[\s\-()]'), '');
+                    final cleanPhone =
+                        value.replaceAll(RegExp(r'[\s\-()]'), '');
                     // Validate UAE phone number format
                     if (!RegExp(r'^\+971[0-9]{9}$').hasMatch(cleanPhone)) {
                       return 'Please enter a valid UAE phone number (+971 XX XXX XXXX)';
@@ -1561,8 +1580,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   controller: _giftMessageController,
                   label: 'Gift Message',
                   maxLines: 3,
-                  validator: (value) =>
-                      value?.isEmpty ?? true ? 'Please enter a gift message' : null,
+                  validator: (value) => value?.isEmpty ?? true
+                      ? 'Please enter a gift message'
+                      : null,
                 ),
               ],
             ],
@@ -1590,11 +1610,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           pointRate = 0.07; // GREEN (7%)
       }
     }
-    
+
     // Calculate points based on total before any discounts (includes delivery)
     // For example: 100 AED * 0.07 = 7 points for GREEN tier
     int pointsToEarn = (_calculateTotalBeforeDiscounts() * pointRate).floor();
-    
+
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(16),
@@ -1633,7 +1653,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               ),
             ),
           ],
-          if (_customerDetails != null && _customerDetails!.rewardPoints > 0) ...[
+          if (_customerDetails != null &&
+              _customerDetails!.rewardPoints > 0) ...[
             const SizedBox(height: 16),
             Text(
               'Available Points: ${_customerDetails!.rewardPoints}',
@@ -1683,7 +1704,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                           }
                         },
                   style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 24, vertical: 12),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
@@ -1758,7 +1780,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   )
                 else
                   ElevatedButton(
-                    onPressed: _isValidatingCoupon ? null : () => _validateCoupon(_couponController.text),
+                    onPressed: _isValidatingCoupon
+                        ? null
+                        : () => _validateCoupon(_couponController.text),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.black,
                       shape: RoundedRectangleBorder(
@@ -1802,7 +1826,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   Widget _buildPriceBreakdown() {
     // Force recalculation of total
     final currentTotal = _calculateTotal();
-    
+
     return Card(
       elevation: 0,
       shape: RoundedRectangleBorder(
@@ -1929,7 +1953,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                                 fit: BoxFit.cover,
                               ),
                             )
-                          : const Icon(Icons.cake, size: 30, color: Colors.grey),
+                          : const Icon(Icons.cake,
+                              size: 30, color: Colors.grey),
                     ),
                     const SizedBox(width: 12),
                     // Product Details
@@ -1954,7 +1979,71 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                               ),
                             ),
                           ],
-                          if (item.cakeText != null && item.cakeText!.isNotEmpty) ...[
+                          if (item.selectedFlavour != null) ...[
+                            const SizedBox(height: 4),
+                            Text(
+                              'Flavour: ${item.selectedFlavour}',
+                              style: TextStyle(
+                                color: Colors.grey[600],
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                          // Display selected options for cake flavors
+                          if (item.selectedOptions
+                              .containsKey('cakeFlavors')) ...[
+                            const SizedBox(height: 4),
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Selected ${item.selectedOptions['variationType']?.toLowerCase() ?? 'flavor'}s:',
+                                  style: TextStyle(
+                                    color: Colors.grey[600],
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                ...((item.selectedOptions['cakeFlavors']
+                                            as List<dynamic>?) ??
+                                        [])
+                                    .map((flavor) {
+                                  return Text(
+                                    'Cake ${flavor['cakeNumber']}: ${flavor['flavor']}',
+                                    style: TextStyle(
+                                      color: Colors.grey[600],
+                                      fontSize: 12,
+                                    ),
+                                  );
+                                }).toList(),
+                              ],
+                            ),
+                          ],
+                          // Display other selected options
+                          if (item.selectedOptions.isNotEmpty &&
+                              !item.selectedOptions
+                                  .containsKey('cakeFlavors') &&
+                              !item.selectedOptions
+                                  .containsKey('cakeText')) ...[
+                            const SizedBox(height: 4),
+                            ...item.selectedOptions.entries
+                                .where((entry) =>
+                                    entry.key != 'variationType' &&
+                                    entry.key != 'size' &&
+                                    entry.key != 'flavour')
+                                .map((entry) {
+                              return Text(
+                                '${entry.key.substring(0, 1).toUpperCase()}${entry.key.substring(1)}: ${entry.value}',
+                                style: TextStyle(
+                                  color: Colors.grey[600],
+                                  fontSize: 12,
+                                ),
+                              );
+                            }).toList(),
+                          ],
+                          if (item.cakeText != null &&
+                              item.cakeText!.isNotEmpty) ...[
                             const SizedBox(height: 4),
                             Text(
                               'Text: ${item.cakeText}',

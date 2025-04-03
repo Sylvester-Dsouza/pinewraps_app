@@ -20,26 +20,24 @@
 	<string>$(FLUTTER_BUILD_NAME)</string>
 	<key>CFBundleSignature</key>
 	<string>????</string>
-	<key>CFBundleVersion</key>
-	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>
 			<key>CFBundleURLSchemes</key>
 			<array>
-				<string>pinewraps</string>
-				<string>com.googleusercontent.apps.1234567890-abcdefghijklmnopqrstuvwxyz</string>
+				<string>com.googleusercontent.apps.181991178384-0768pbr5j4b0svq374ql8jmqm8lha5gi</string>
 			</array>
 			<key>CFBundleURLName</key>
 			<string>com.pinewraps.app</string>
 		</dict>
 	</array>
-	<key>com.apple.developer.applesignin</key>
+	<key>CFBundleVersion</key>
+	<string>$(FLUTTER_BUILD_NUMBER)</string>
+	<key>LSApplicationQueriesSchemes</key>
 	<array>
-		<string>Default</string>
+		<string>https</string>
+		<string>http</string>
 	</array>
-	<key>GIDClientID</key>
-	<string>1234567890-abcdefghijklmnopqrstuvwxyz.apps.googleusercontent.com</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>

@@ -37,9 +37,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       print('Customer data received: ${customer.toJson()}');
       
       setState(() {
-        _firstNameController.text = customer.firstName ?? '';
-        _lastNameController.text = customer.lastName ?? '';
-        _emailController.text = customer.email ?? '';
+        _firstNameController.text = customer.firstName;
+        _lastNameController.text = customer.lastName;
+        _emailController.text = customer.email;
         _phoneController.text = customer.phone != null ? customer.phone!.replaceFirst('+971', '') : '';
         _selectedDate = customer.birthDate;
         _isLoading = false;
@@ -226,8 +226,35 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                         'google.com') ...[
                       const SizedBox(height: 16),
                       TextButton(
-                        onPressed: () {
-                          // TODO: Implement password reset
+                        onPressed: () async {
+                          try {
+                            setState(() => _isLoading = true);
+                            final authService = AuthService();
+                            
+                            // Get the current user's email from Firebase Auth
+                            final user = FirebaseAuth.instance.currentUser;
+                            if (user == null || user.email == null || user.email!.isEmpty) {
+                              throw Exception('User email not available');
+                            }
+                            
+                            final email = user.email!;
+                            await authService.resetPassword(email);
+                            
+                            if (!mounted) return;
+                            setState(() => _isLoading = false);
+                            
+                            ToastUtils.showSuccessToast(
+                              'Password reset email sent to $email. Please check your inbox.',
+                            );
+                          } catch (e) {
+                            setState(() => _isLoading = false);
+                            print('Error sending password reset email: $e');
+                            
+                            if (!mounted) return;
+                            ToastUtils.showErrorToast(
+                              'Failed to send password reset email: ${e.toString()}',
+                            );
+                          }
                         },
                         child: const Text('Reset Password'),
                       ),

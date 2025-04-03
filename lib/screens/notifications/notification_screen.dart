@@ -3,7 +3,6 @@ import 'package:intl/intl.dart';
 import 'package:line_icons/line_icons.dart';
 import '../../services/notification_service.dart';
 import '../../widgets/loading_indicator.dart';
-import '../../widgets/app_bar.dart';
 import 'notification_detail_screen.dart';
 
 class NotificationScreen extends StatefulWidget {
@@ -219,7 +218,8 @@ class _NotificationScreenState extends State<NotificationScreen> {
                         Text(
                           title,
                           style: TextStyle(
-                            fontWeight: isRead ? FontWeight.normal : FontWeight.bold,
+                            fontWeight:
+                                isRead ? FontWeight.normal : FontWeight.bold,
                             fontSize: 16,
                           ),
                         ),

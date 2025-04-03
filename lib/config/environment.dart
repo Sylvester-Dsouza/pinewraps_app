@@ -7,16 +7,17 @@ enum Environment {
 class EnvironmentConfig {
   // Current environment
   static Environment _environment = Environment.development;
-  
+
   // Base URLs for different environments
   static const String _baseLocalUrl = 'http://localhost:3001';
-  static const String _baseLocalNetworkUrl = 'http://192.168.1.4:3001'; // Computer's IP on local network
+  static String _baseLocalNetworkUrl =
+      'http://localhost:3001'; // Will be set dynamically
   static const String _baseEmulatorUrl = 'http://10.0.2.2:3001';
   static const String _baseProductionUrl = 'https://pinewraps-api.onrender.com';
-  
+
   // Use emulator flag
   static bool _useEmulator = false;
-  
+
   // Use physical device flag
   static bool _usePhysicalDevice = true;
 
@@ -47,10 +48,15 @@ class EnvironmentConfig {
   static void useEmulator(bool useEmulator) {
     _useEmulator = useEmulator;
   }
-  
+
   // Toggle physical device mode
   static void usePhysicalDevice(bool usePhysicalDevice) {
     _usePhysicalDevice = usePhysicalDevice;
+  }
+
+  // Set local network URL (for physical devices)
+  static void setLocalNetworkUrl(String ip) {
+    _baseLocalNetworkUrl = 'http://$ip:3001';
   }
 
   static String get baseUrl => _currentBaseUrl;
@@ -59,6 +65,7 @@ class EnvironmentConfig {
   static String get uploadBaseUrl => '$_currentBaseUrl/uploads';
 
   static bool get isDevelopment => _environment == Environment.development;
-  static bool get isRunningInProduction => _environment == Environment.production;
+  static bool get isRunningInProduction =>
+      _environment == Environment.production;
   static bool get isProduction => _environment == Environment.production;
 }

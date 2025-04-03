@@ -69,7 +69,8 @@ class AddressCard extends StatelessWidget {
                                   'Are you sure you want to delete this address?'),
                               actions: [
                                 TextButton(
-                                  onPressed: () => Navigator.pop(context, false),
+                                  onPressed: () =>
+                                      Navigator.pop(context, false),
                                   child: const Text('Cancel'),
                                 ),
                                 TextButton(
@@ -150,7 +151,7 @@ class AddressCard extends StatelessWidget {
                   color: Colors.grey[600],
                 ),
               ),
-              if (address.pincode != null) ...[
+              if (address.pincode.isNotEmpty) ...[
                 Text(
                   'PIN: ${address.pincode}',
                   style: TextStyle(
@@ -162,7 +163,8 @@ class AddressCard extends StatelessWidget {
               if (address.isDefault) ...[
                 const SizedBox(height: 8),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
                     color: Colors.green[50],
                     borderRadius: BorderRadius.circular(4),

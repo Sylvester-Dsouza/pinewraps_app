@@ -17,7 +17,7 @@ class OrderStatusBadge extends StatelessWidget {
         vertical: 6,
       ),
       decoration: BoxDecoration(
-        color: _getStatusColor().withOpacity(0.1),
+        color: _getStatusColor().withAlpha(26),
         borderRadius: BorderRadius.circular(20),
       ),
       child: Text(

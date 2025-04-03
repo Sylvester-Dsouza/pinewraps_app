@@ -1,5 +1,3 @@
-import 'dart:convert';
-
 class ProductOption {
   final String id;
   final String value;
@@ -149,10 +147,12 @@ class Product {
       // Handle both FLAVOUR and FLAVOR spellings
       if (type.toUpperCase() == 'FLAVOUR' || type.toUpperCase() == 'FLAVOR') {
         return variations.firstWhere(
-          (v) => v.type.toUpperCase() == 'FLAVOUR' || v.type.toUpperCase() == 'FLAVOR',
+          (v) =>
+              v.type.toUpperCase() == 'FLAVOUR' ||
+              v.type.toUpperCase() == 'FLAVOR',
         );
       }
-      
+
       return variations.firstWhere(
         (v) => v.type.toUpperCase() == type.toUpperCase(),
       );
@@ -163,10 +163,10 @@ class Product {
 
   // Helper method to check if product is in Sets category
   bool get isSetCategory {
-    return categoryId.toLowerCase() == 'sets' || 
-           category.name.toLowerCase() == 'sets' ||
-           name.toLowerCase().contains('set of') ||
-           description.toLowerCase().contains('set of 4');
+    return categoryId.toLowerCase() == 'sets' ||
+        category.name.toLowerCase() == 'sets' ||
+        name.toLowerCase().contains('set of') ||
+        description.toLowerCase().contains('set of 4');
   }
 
   // Get formatted price string
@@ -175,20 +175,21 @@ class Product {
     if (isSetCategory) {
       return 'Starting From 332 Onwards';
     }
-    
+
     // For single variant products, show the option prices directly
     if (variations.length == 1) {
       final options = variations[0].options;
       if (options.isNotEmpty) {
         // Get all prices directly from options
-        final prices = options.map((opt) => opt.priceAdjustment).toList()..sort();
+        final prices = options.map((opt) => opt.priceAdjustment).toList()
+          ..sort();
         if (prices.length == 1) {
           return '${prices[0].toStringAsFixed(0)} AED';
         }
         return '${prices.first.toStringAsFixed(0)} - ${prices.last.toStringAsFixed(0)} AED';
       }
     }
-    
+
     // For multi-variant products, check combinations
     if (variantCombinations.isNotEmpty) {
       final prices = variantCombinations
@@ -197,7 +198,7 @@ class Product {
           .map((price) => price is int ? price.toDouble() : (price as double))
           .toList()
         ..sort();
-      
+
       if (prices.isNotEmpty) {
         if (prices.length == 1) {
           return '${prices[0].toStringAsFixed(0)} AED';
@@ -205,39 +206,45 @@ class Product {
         return '${prices.first.toStringAsFixed(0)} - ${prices.last.toStringAsFixed(0)} AED';
       }
     }
-    
+
     // Only use base price if no variations exist
     return '${basePrice.toStringAsFixed(0)} AED';
   }
 
   double getPriceForVariations(String? size, String? flavour) {
     print('Getting price for - Size: $size, Flavour: $flavour'); // Debug log
-    
+
     // For single variant products, return the option price directly
     if (variations.length == 1) {
       final variation = variations[0];
       final selectedValue = variation.type == 'SIZE' ? size : flavour;
-      print('Single variant product - Type: ${variation.type}, Selected: $selectedValue'); // Debug log
-      
+      print(
+          'Single variant product - Type: ${variation.type}, Selected: $selectedValue'); // Debug log
+
       if (selectedValue != null) {
         try {
           final option = variation.options.firstWhere(
             (o) => o.value == selectedValue,
           );
-          print('Found option - Value: ${option.value}, Price: ${option.priceAdjustment}'); // Debug log
-          return option.priceAdjustment > 0 ? option.priceAdjustment : basePrice;
+          print(
+              'Found option - Value: ${option.value}, Price: ${option.priceAdjustment}'); // Debug log
+          return option.priceAdjustment > 0
+              ? option.priceAdjustment
+              : basePrice;
         } catch (e) {
           print('Error finding option: $e'); // Debug log
           return basePrice;
         }
       }
     }
-    
+
     // For multi-variant products, check combinations
     if (variantCombinations.isNotEmpty && size != null && flavour != null) {
       try {
         final combo = variantCombinations.firstWhere(
-          (c) => c['size'].toString() == size && c['flavour'].toString() == flavour,
+          (c) =>
+              c['size'].toString() == size &&
+              c['flavour'].toString() == flavour,
         );
         if (combo['price'] != null) {
           final price = combo['price'];
@@ -245,7 +252,7 @@ class Product {
         }
       } catch (_) {}
     }
-    
+
     return basePrice;
   }
 
@@ -257,7 +264,7 @@ class Product {
         return options[0].priceAdjustment;
       }
     }
-    
+
     // For multi-variant products with combinations, return the first combination price
     if (variantCombinations.isNotEmpty) {
       final firstCombo = variantCombinations[0];
@@ -266,7 +273,7 @@ class Product {
         return price is int ? price.toDouble() : (price as double);
       }
     }
-    
+
     // Only use base price if no variations exist
     return basePrice;
   }
@@ -284,22 +291,28 @@ class Product {
         'id': category.id,
         'name': category.name,
       },
-      'images': images.map((i) => {
-        'id': i.id,
-        'url': i.url,
-        'alt': i.alt,
-        'isPrimary': i.isPrimary,
-      }).toList(),
-      'variations': variations.map((v) => {
-        'id': v.id,
-        'type': v.type,
-        'options': v.options.map((o) => {
-          'id': o.id,
-          'value': o.value,
-          'priceAdjustment': o.priceAdjustment,
-          'stock': o.stock,
-        }).toList(),
-      }).toList(),
+      'images': images
+          .map((i) => {
+                'id': i.id,
+                'url': i.url,
+                'alt': i.alt,
+                'isPrimary': i.isPrimary,
+              })
+          .toList(),
+      'variations': variations
+          .map((v) => {
+                'id': v.id,
+                'type': v.type,
+                'options': v.options
+                    .map((o) => {
+                          'id': o.id,
+                          'value': o.value,
+                          'priceAdjustment': o.priceAdjustment,
+                          'stock': o.stock,
+                        })
+                    .toList(),
+              })
+          .toList(),
       'variantCombinations': variantCombinations,
       'allowCustomText': allowCustomText,
       'sizes': sizes,
@@ -308,30 +321,6 @@ class Product {
   }
 
   factory Product.fromJson(Map<String, dynamic> json) {
-    List<Map<String, dynamic>> parseCombinations(dynamic combinations) {
-      if (combinations == null) return [];
-      if (combinations is String) {
-        try {
-          final List<dynamic> parsed = jsonDecode(combinations);
-          return List<Map<String, dynamic>>.from(parsed);
-        } catch (e) {
-          print('Error parsing variant combinations: $e');
-          return [];
-        }
-      }
-      if (combinations is List) {
-        // Convert each item to ensure it's Map<String, dynamic>
-        return combinations.map((item) {
-          if (item is Map<String, dynamic>) {
-            return item;
-          } else {
-            return <String, dynamic>{};
-          }
-        }).toList();
-      }
-      return [];
-    }
-
     try {
       // Extract sizes and flavours from options
       List<String> extractedSizes = [];
@@ -342,7 +331,7 @@ class Product {
         for (var option in json['options']) {
           if (option is Map<String, dynamic> && option['name'] != null) {
             String optionName = option['name'].toString().toUpperCase();
-            
+
             // Extract values for this option
             if (option['values'] != null && option['values'] is List) {
               List<String> values = [];
@@ -351,7 +340,7 @@ class Product {
                   values.add(value['value'].toString());
                 }
               }
-              
+
               // Determine if this is a size or flavour option
               if (optionName == 'SIZE') {
                 extractedSizes = values;
@@ -368,44 +357,46 @@ class Product {
       // Process variants and their values
       List<ProductVariation> productVariations = [];
       List<Map<String, dynamic>> variantCombinations = [];
-      
+
       if (json['variants'] != null && json['variants'] is List) {
         // Group variants by option type (SIZE/FLAVOUR)
         Map<String, ProductVariation> variationsMap = {};
-        
+
         // First, process all variants to build combinations
         for (var variant in json['variants']) {
           if (variant is Map<String, dynamic>) {
-            double variantPrice = variant['price'] is num 
+            double variantPrice = variant['price'] is num
                 ? (variant['price'] as num).toDouble()
                 : 0.0;
-                
+
             // Process variant values to determine which options they belong to
             if (variant['values'] != null && variant['values'] is List) {
               Map<String, dynamic> combinationData = {
                 'price': variantPrice,
               };
-              
+
               for (var valueData in variant['values']) {
-                if (valueData is Map<String, dynamic> && 
-                    valueData['value'] != null && 
+                if (valueData is Map<String, dynamic> &&
+                    valueData['value'] != null &&
                     valueData['value']['value'] != null) {
-                  
                   String optionName = '';
-                  if (valueData['value']['option'] != null && 
+                  if (valueData['value']['option'] != null &&
                       valueData['value']['option']['name'] != null) {
-                    optionName = valueData['value']['option']['name'].toString().toUpperCase();
+                    optionName = valueData['value']['option']['name']
+                        .toString()
+                        .toUpperCase();
                   }
-                  
+
                   String optionValue = valueData['value']['value'].toString();
-                  
+
                   // Map to size/flavour for combinations
                   if (optionName == 'SIZE') {
                     combinationData['size'] = optionValue;
-                  } else if (optionName == 'FLAVOUR' || optionName == 'FLAVOR') {
+                  } else if (optionName == 'FLAVOUR' ||
+                      optionName == 'FLAVOR') {
                     combinationData['flavour'] = optionValue;
                   }
-                  
+
                   // Create or update option variation
                   if (!variationsMap.containsKey(optionName)) {
                     variationsMap[optionName] = ProductVariation(
@@ -414,33 +405,38 @@ class Product {
                       options: [],
                     );
                   }
-                  
+
                   // Add option if not already present
-                  bool optionExists = variationsMap[optionName]!.options.any((o) => o.value == optionValue);
+                  bool optionExists = variationsMap[optionName]!
+                      .options
+                      .any((o) => o.value == optionValue);
                   if (!optionExists) {
                     variationsMap[optionName]!.options.add(
-                      ProductOption(
-                        id: '$optionName-$optionValue',
-                        value: optionValue,
-                        priceAdjustment: variantPrice,
-                        stock: variant['stock'] is num ? (variant['stock'] as num).toInt() : 0,
-                      ),
-                    );
+                          ProductOption(
+                            id: '$optionName-$optionValue',
+                            value: optionValue,
+                            priceAdjustment: variantPrice,
+                            stock: variant['stock'] is num
+                                ? (variant['stock'] as num).toInt()
+                                : 0,
+                          ),
+                        );
                   }
                 }
               }
-              
+
               // Only add valid combinations
-              if (combinationData.containsKey('size') || combinationData.containsKey('flavour')) {
+              if (combinationData.containsKey('size') ||
+                  combinationData.containsKey('flavour')) {
                 variantCombinations.add(combinationData);
               }
             }
           }
         }
-        
+
         // Convert map to list
         productVariations = variationsMap.values.toList();
-        
+
         // Log variation details
         print('Processed ${productVariations.length} variations:');
         for (var variation in productVariations) {
@@ -449,33 +445,34 @@ class Product {
             print('  - ${option.value}: ${option.priceAdjustment}');
           }
         }
-        
+
         print('Generated ${variantCombinations.length} combinations:');
         for (var combo in variantCombinations) {
-          print('- Size: ${combo['size']}, Flavour: ${combo['flavour']}, Price: ${combo['price']}');
+          print(
+              '- Size: ${combo['size']}, Flavour: ${combo['flavour']}, Price: ${combo['price']}');
         }
       }
-      
+
       // Get base price or calculate from options if needed
       double initialPrice = 0.0;
-      
+
       // First try to get basePrice from json
       if (json['basePrice'] != null) {
-        initialPrice = (json['basePrice'] is num) 
-            ? (json['basePrice'] as num).toDouble() 
+        initialPrice = (json['basePrice'] is num)
+            ? (json['basePrice'] as num).toDouble()
             : 0.0;
-      } 
+      }
       // Fallback to price
       else if (json['price'] != null) {
-        initialPrice = (json['price'] is num) 
-            ? (json['price'] as num).toDouble() 
-            : 0.0;
+        initialPrice =
+            (json['price'] is num) ? (json['price'] as num).toDouble() : 0.0;
       }
       // If still no price but we have variations, use the first option's price
-      else if (productVariations.isNotEmpty && productVariations[0].options.isNotEmpty) {
+      else if (productVariations.isNotEmpty &&
+          productVariations[0].options.isNotEmpty) {
         initialPrice = productVariations[0].options[0].priceAdjustment;
       }
-      
+
       // Process images
       List<ProductImage> productImages = [];
       if (json['images'] != null && json['images'] is List) {
@@ -491,7 +488,7 @@ class Product {
           );
         }).toList();
       }
-      
+
       return Product(
         id: json['_id'] as String? ?? json['id'] as String? ?? '',
         name: json['name'] as String? ?? 'Unknown Product',
@@ -504,14 +501,15 @@ class Product {
         variations: productVariations,
         variantCombinations: variantCombinations,
         category: ProductCategory.fromJson(
-          json['category'] is Map<String, dynamic>
-              ? json['category'] as Map<String, dynamic>
-              : {'id': '', 'name': 'Uncategorized'}),
+            json['category'] is Map<String, dynamic>
+                ? json['category'] as Map<String, dynamic>
+                : {'id': '', 'name': 'Uncategorized'}),
         basePrice: initialPrice,
-        allowCustomText: json['allowCustomText'] as bool? ?? 
-          (json['category'] != null && json['category'] is Map<String, dynamic> && 
-           json['category']['name'] != null && 
-           json['category']['name'].toString().toLowerCase() == 'cake'),
+        allowCustomText: json['allowCustomText'] as bool? ??
+            (json['category'] != null &&
+                json['category'] is Map<String, dynamic> &&
+                json['category']['name'] != null &&
+                json['category']['name'].toString().toLowerCase() == 'cake'),
         images: productImages,
       );
     } catch (e, stackTrace) {

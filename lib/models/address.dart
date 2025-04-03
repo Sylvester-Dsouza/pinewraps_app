@@ -5,12 +5,14 @@ enum AddressType {
 
 class Address {
   String? id;
+  String name;
   String street;
   String apartment;
   String emirate;
   String city;
   String pincode;
   String country;
+  String phone;
   bool isDefault;
   AddressType type;
   DateTime? createdAt;
@@ -49,12 +51,14 @@ class Address {
 
   Address({
     this.id,
+    required this.name,
     required this.street,
     required this.apartment,
     required this.emirate,
     required this.city,
-    required this.pincode,
+    this.pincode = '',
     this.country = 'United Arab Emirates',
+    this.phone = '',
     this.isDefault = false,
     this.type = AddressType.SHIPPING,
     this.createdAt,
@@ -67,12 +71,14 @@ class Address {
       final typeStr = json['type'] as String? ?? 'SHIPPING';
       return Address(
         id: json['id'] as String?,
+        name: json['name'] as String? ?? '',
         street: json['street'] as String? ?? '',
         apartment: json['apartment'] as String? ?? '',
         emirate: emirates.contains(emirate) ? emirate : 'DUBAI',
         city: json['city'] as String? ?? '',
         pincode: json['pincode'] as String? ?? '',
         country: json['country'] as String? ?? 'United Arab Emirates',
+        phone: json['phone'] as String? ?? '',
         isDefault: json['isDefault'] as bool? ?? false,
         type: AddressType.values.firstWhere(
           (e) => e.toString() == 'AddressType.$typeStr',
@@ -92,12 +98,14 @@ class Address {
     try {
       return {
         if (id != null) 'id': id,
+        'name': name.trim(),
         'street': street.trim(),
         'apartment': apartment.trim(),
         'emirate': emirate,
         'city': city.trim(),
         'pincode': pincode.trim(),
         'country': country,
+        'phone': phone.trim(),
         'isDefault': isDefault,
         'type': type.toString().split('.').last,
         if (createdAt != null) 'createdAt': createdAt!.toIso8601String(),
@@ -111,12 +119,14 @@ class Address {
 
   Address copyWith({
     String? id,
+    String? name,
     String? street,
     String? apartment,
     String? emirate,
     String? city,
     String? pincode,
     String? country,
+    String? phone,
     bool? isDefault,
     AddressType? type,
     DateTime? createdAt,
@@ -124,12 +134,14 @@ class Address {
   }) {
     return Address(
       id: id ?? this.id,
+      name: name ?? this.name,
       street: street ?? this.street,
       apartment: apartment ?? this.apartment,
       emirate: emirate ?? this.emirate,
       city: city ?? this.city,
       pincode: pincode ?? this.pincode,
       country: country ?? this.country,
+      phone: phone ?? this.phone,
       isDefault: isDefault ?? this.isDefault,
       type: type ?? this.type,
       createdAt: createdAt ?? this.createdAt,
@@ -139,6 +151,7 @@ class Address {
 
   String get formattedAddress {
     final parts = [
+      name,
       street,
       if (apartment.isNotEmpty) apartment,
       city,

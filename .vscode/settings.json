@@ -1,0 +1,13 @@
+{
+    "git.enableSmartCommit": true,
+    "git.confirmSync": false,
+    "git.autofetch": true,
+    "git.autoStash": true,
+    "git.fetchOnPull": true,
+    "git.untrackedChanges": "mixed",
+    "git.showActionButton": {
+        "commit": true,
+        "publish": true,
+        "sync": true
+    }
+}

@@ -6,12 +6,6 @@ import 'package:whatsapp_unilink/whatsapp_unilink.dart';
 class HelpSupportScreen extends StatelessWidget {
   const HelpSupportScreen({super.key});
 
-  Future<void> _launchUrl(String url) async {
-    if (await canLaunchUrl(Uri.parse(url))) {
-      await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
-    }
-  }
-
   Future<void> _launchWhatsApp() async {
     const phone = "971544044864"; // Without '+' prefix
     const message = "Hi, I need help with my order";
@@ -148,7 +142,7 @@ class HelpSupportScreen extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
+            color: Colors.grey.withAlpha(26),
             spreadRadius: 0,
             blurRadius: 10,
             offset: const Offset(0, 4),
@@ -167,7 +161,7 @@ class HelpSupportScreen extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: color.withOpacity(0.1),
+                    color: color.withAlpha(26),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Icon(

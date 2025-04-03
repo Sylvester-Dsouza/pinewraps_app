@@ -22,7 +22,7 @@ class CategoryCard extends StatelessWidget {
           image: AssetImage(imageUrl),
           fit: BoxFit.cover,
           colorFilter: ColorFilter.mode(
-            Colors.black.withOpacity(0.3),
+            Colors.black.withAlpha(77),
             BlendMode.darken,
           ),
         ),
@@ -50,7 +50,7 @@ class CategoryCard extends StatelessWidget {
                 Text(
                   itemCount,
                   style: TextStyle(
-                    color: Colors.white.withOpacity(0.8),
+                    color: Colors.white.withAlpha(204),
                     fontSize: 14,
                   ),
                 ),

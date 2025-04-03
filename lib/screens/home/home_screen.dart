@@ -4,10 +4,7 @@ import '../../widgets/app_drawer.dart';
 import '../../models/product.dart';
 import '../../services/product_service.dart';
 import '../product/product_details_screen.dart';
-import '../shop/shop_screen.dart';
 import '../main_screen.dart';
-import '../notifications/notification_screen.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../../widgets/notification_icon.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -35,11 +32,11 @@ class _HomeScreenState extends State<HomeScreen> {
         _isLoading = true;
         _error = null;
       });
-      
+
       print('Home screen: Loading featured products');
       // Use the product service to get a limited number of products for the home screen
       final products = await _productService.getAllProducts(limit: 8);
-      
+
       if (mounted) {
         setState(() {
           _products = products;
@@ -52,7 +49,7 @@ class _HomeScreenState extends State<HomeScreen> {
       if (mounted) {
         setState(() {
           _isLoading = false;
-          
+
           // Extract the most user-friendly part of the error message
           String errorMsg = e.toString();
           if (errorMsg.contains('Could not connect to the server')) {
@@ -60,12 +57,15 @@ class _HomeScreenState extends State<HomeScreen> {
               // This is a special error message we added for physical devices
               _error = errorMsg;
             } else {
-              _error = 'Could not connect to the server. Please check if the server is running.';
+              _error =
+                  'Could not connect to the server. Please check if the server is running.';
             }
           } else if (errorMsg.contains('Connection timed out')) {
-            _error = 'Connection timed out. Please check your internet connection.';
+            _error =
+                'Connection timed out. Please check your internet connection.';
           } else if (errorMsg.contains('Connection refused')) {
-            _error = 'Could not connect to the server. If you\'re using a physical device, make sure the server IP address is correct.';
+            _error =
+                'Could not connect to the server. If you\'re using a physical device, make sure the server IP address is correct.';
           } else {
             // Limit error message length to avoid UI issues
             if (errorMsg.length > 100) {
@@ -115,8 +115,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
                     colors: [
-                      Colors.black.withOpacity(0.1),
-                      Colors.black.withOpacity(0.1),
+                      Colors.black.withAlpha(26),
+                      Colors.black.withAlpha(26),
                     ],
                   ),
                 ),
@@ -139,7 +139,8 @@ class _HomeScreenState extends State<HomeScreen> {
                           Navigator.pushReplacement(
                             context,
                             MaterialPageRoute(
-                              builder: (context) => const MainScreen(initialIndex: 1),
+                              builder: (context) =>
+                                  const MainScreen(initialIndex: 1),
                             ),
                           );
                         },
@@ -166,7 +167,8 @@ class _HomeScreenState extends State<HomeScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Row(
                 children: [
-                  Expanded(child: Container(height: 1, color: Colors.grey[300])),
+                  Expanded(
+                      child: Container(height: 1, color: Colors.grey[300])),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     child: Text(
@@ -179,7 +181,8 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                     ),
                   ),
-                  Expanded(child: Container(height: 1, color: Colors.grey[300])),
+                  Expanded(
+                      child: Container(height: 1, color: Colors.grey[300])),
                 ],
               ),
             ),
@@ -219,7 +222,8 @@ class _HomeScreenState extends State<HomeScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Row(
                 children: [
-                  Expanded(child: Container(height: 1, color: Colors.grey[300])),
+                  Expanded(
+                      child: Container(height: 1, color: Colors.grey[300])),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     child: Text(
@@ -232,7 +236,8 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                     ),
                   ),
-                  Expanded(child: Container(height: 1, color: Colors.grey[300])),
+                  Expanded(
+                      child: Container(height: 1, color: Colors.grey[300])),
                 ],
               ),
             ),
@@ -319,7 +324,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(
-                  color: Colors.grey[200]!,
+                  color: Colors.black.withAlpha(26),
                   width: 1,
                 ),
               ),
@@ -331,7 +336,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
                           color: Colors.white,
-                          border: Border.all(color: Colors.black.withOpacity(0.1)),
+                          border: Border.all(color: Colors.black.withAlpha(26)),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: const Icon(
@@ -347,17 +352,23 @@ class _HomeScreenState extends State<HomeScreen> {
                           children: [
                             Text(
                               'Earn Points with Every Order',
-                              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                fontWeight: FontWeight.bold,
-                                color: Colors.black,
-                              ),
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .titleMedium
+                                  ?.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.black,
+                                  ),
                             ),
                             const SizedBox(height: 4),
                             Text(
                               'Redeem Points for Rewards',
-                              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                color: Colors.grey[600],
-                              ),
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodyMedium
+                                  ?.copyWith(
+                                    color: Colors.grey[600],
+                                  ),
                             ),
                           ],
                         ),
@@ -429,8 +440,8 @@ class _HomeScreenState extends State<HomeScreen> {
               begin: Alignment.centerLeft,
               end: Alignment.centerRight,
               colors: [
-                Colors.black.withOpacity(0.7),
-                Colors.black.withOpacity(0.3),
+                Colors.black.withAlpha(179),
+                Colors.black.withAlpha(77),
               ],
             ),
           ),
@@ -478,7 +489,7 @@ class _HomeScreenState extends State<HomeScreen> {
             color: Colors.white,
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.06),
+                color: Colors.black.withAlpha(15),
                 blurRadius: 20,
                 offset: const Offset(0, 8),
               ),
@@ -557,16 +568,16 @@ class _HomeScreenState extends State<HomeScreen> {
           Text(
             title,
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              fontWeight: FontWeight.bold,
-              color: Colors.black,
-            ),
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black,
+                ),
           ),
           const SizedBox(height: 2),
           Text(
             subtitle,
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: Colors.grey[600],
-            ),
+                  color: Colors.grey[600],
+                ),
             textAlign: TextAlign.center,
           ),
         ],

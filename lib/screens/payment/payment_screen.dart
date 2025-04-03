@@ -55,19 +55,19 @@ class _PaymentScreenState extends State<PaymentScreen> {
           onNavigationRequest: (NavigationRequest request) {
             print('Navigation request: ${request.url}');
             final uri = Uri.parse(request.url);
-            
+
             // Check if this is a redirect back to our app
-            if ((uri.host == 'pinewraps-api.onrender.com' || 
-                uri.host.contains('pinewraps.com')) && 
-                (uri.path.contains('/payments/mobile-callback') || 
-                 uri.path.contains('/checkout/success') || 
-                 uri.path.contains('/checkout/error') ||
-                 uri.path.contains('/checkout/cancel'))) {
+            if ((uri.host == 'pinewraps-api.onrender.com' ||
+                    uri.host.contains('pinewraps.com')) &&
+                (uri.path.contains('/payments/mobile-callback') ||
+                    uri.path.contains('/checkout/success') ||
+                    uri.path.contains('/checkout/error') ||
+                    uri.path.contains('/checkout/cancel'))) {
               print('Detected payment callback: $uri');
               _handlePaymentCallback(uri);
               return NavigationDecision.prevent;
             }
-            
+
             // Allow all other navigation
             return NavigationDecision.navigate;
           },
@@ -103,27 +103,27 @@ class _PaymentScreenState extends State<PaymentScreen> {
 
   Future<void> _handlePaymentCallback(Uri uri) async {
     if (_isCompleted || _isProcessing) return;
-    
+
     print('Handling payment callback: ${uri.toString()}');
     setState(() => _isProcessing = true);
-    
+
     try {
       // Check if payment was cancelled directly from URL path or query param
-      if (uri.queryParameters['cancelled'] == 'true' || 
-          uri.path.contains('/checkout/error') || 
+      if (uri.queryParameters['cancelled'] == 'true' ||
+          uri.path.contains('/checkout/error') ||
           uri.path.contains('/checkout/cancel')) {
         print('Payment was cancelled or failed');
         _completePayment(false);
         return;
       }
-      
+
       // Check if payment was successful from URL path
       if (uri.path.contains('/checkout/success')) {
         print('Payment success indicated by URL path');
-        
+
         // Get reference from URL or use the one passed to widget
         final reference = uri.queryParameters['ref'] ?? widget.reference;
-        
+
         // Double check with server for extra safety
         try {
           final verified = await _paymentService.verifyPayment(reference);
@@ -139,7 +139,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
       // Standard verification path
       final reference = uri.queryParameters['ref'] ?? widget.reference;
       print('Verifying payment with reference: $reference');
-      
+
       // Wait for confirmation using the merchant order ID (reference)
       print('Waiting for payment confirmation...');
       final success = await _paymentService.verifyPayment(reference);
@@ -153,21 +153,21 @@ class _PaymentScreenState extends State<PaymentScreen> {
 
   void _completePayment(bool success) {
     if (_isCompleted) return;
-    
+
     print('Completing payment: ${success ? 'success' : 'failure'}');
     _isCompleted = true;
-    
+
     if (mounted) {
       // Pop all screens up to the root
       Navigator.of(context).popUntil((route) => route.isFirst);
-      
+
       // Navigate to success or failure screen
       if (success) {
         Navigator.pushReplacementNamed(context, '/order-success');
       } else {
         Navigator.pushReplacementNamed(context, '/order-failed');
       }
-      
+
       // Call the completion callback
       widget.onPaymentComplete(success);
     }
@@ -175,20 +175,22 @@ class _PaymentScreenState extends State<PaymentScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return WillPopScope(
-      onWillPop: () async {
-        if (!_isCompleted && !_isProcessing) {
+    return PopScope(
+      canPop: _isCompleted,
+      onPopInvokedWithResult: (didPop, dynamic result) {
+        if (!didPop && !_isCompleted && !_isProcessing) {
           _completePayment(false);
         }
-        return _isCompleted;
       },
       child: Scaffold(
         appBar: AppBar(
           title: const Text('Payment'),
-          leading: _isProcessing ? null : IconButton(
-            icon: const Icon(Icons.close),
-            onPressed: () => _completePayment(false),
-          ),
+          leading: _isProcessing
+              ? null
+              : IconButton(
+                  icon: const Icon(Icons.close),
+                  onPressed: () => _completePayment(false),
+                ),
         ),
         body: Stack(
           children: [
@@ -203,9 +205,9 @@ class _PaymentScreenState extends State<PaymentScreen> {
                       const CircularProgressIndicator(),
                       const SizedBox(height: 16),
                       Text(
-                        _isProcessing 
-                          ? 'Processing payment...\nPlease wait'
-                          : 'Loading...',
+                        _isProcessing
+                            ? 'Processing payment...\nPlease wait'
+                            : 'Loading...',
                         textAlign: TextAlign.center,
                         style: const TextStyle(color: Colors.white),
                       ),

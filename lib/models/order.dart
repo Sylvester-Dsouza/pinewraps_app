@@ -315,7 +315,7 @@ class Order {
         deliveryType: deliveryType,
         deliveryDate: parseDate(json['deliveryDate']),
         deliverySlot: json['deliveryTimeSlot']?.toString(),
-        deliveryFee: deliveryFee ?? 0.0,
+        deliveryFee: deliveryFee,
         deliveryInstructions: json['deliveryInstructions']?.toString(),
         pickupDate: parseDate(json['pickupDate']),
         pickupTimeSlot: json['pickupTimeSlot']?.toString(),

@@ -44,15 +44,20 @@ class OrderDetailsScreen extends StatelessWidget {
                       ),
                       // Source badge
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 5),
                         decoration: BoxDecoration(
-                          color: order.source == 'POS' ? Colors.blue[100] : Colors.green[100],
+                          color: order.source == 'POS'
+                              ? Colors.blue[100]
+                              : Colors.green[100],
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Text(
                           order.source == 'POS' ? 'In-Store' : 'Online',
                           style: TextStyle(
-                            color: order.source == 'POS' ? Colors.blue : Colors.green,
+                            color: order.source == 'POS'
+                                ? Colors.blue
+                                : Colors.green,
                             fontWeight: FontWeight.w500,
                             fontSize: 12,
                           ),
@@ -167,9 +172,12 @@ class OrderDetailsScreen extends StatelessWidget {
                   ),
                   const Divider(height: 24),
                   _buildPriceRow('Subtotal', order.subtotal),
-                  if (order.discount > 0) _buildPriceRow('Discount', -order.discount),
-                  if (order.deliveryFee > 0) _buildPriceRow('Delivery Fee', order.deliveryFee),
-                  if (order.pointsValue > 0) _buildPriceRow('Points Redeemed', -order.pointsValue),
+                  if (order.discount > 0)
+                    _buildPriceRow('Discount', -order.discount),
+                  if (order.deliveryFee > 0)
+                    _buildPriceRow('Delivery Fee', order.deliveryFee),
+                  if (order.pointsValue > 0)
+                    _buildPriceRow('Points Redeemed', -order.pointsValue),
                   const SizedBox(height: 8),
                   _buildPriceRow('Total', order.total, isTotal: true),
                 ],
@@ -196,9 +204,14 @@ class OrderDetailsScreen extends StatelessWidget {
                   _buildInfoRow('Order Number', order.orderNumber),
                   _buildInfoRow('Order Date', _formatDate(order.createdAt)),
                   _buildInfoRow('Order Time', _formatTime(order.createdAt)),
-                  _buildInfoRow('Source', order.source == 'POS' ? 'In-Store Purchase' : 'Online Order'),
+                  _buildInfoRow(
+                      'Source',
+                      order.source == 'POS'
+                          ? 'In-Store Purchase'
+                          : 'Online Order'),
                   _buildInfoRow('Status', order.status.label),
-                  _buildInfoRow('Payment Status', order.paymentStatus.name.replaceAll('_', ' ')),
+                  _buildInfoRow('Payment Status',
+                      order.paymentStatus.name.replaceAll('_', ' ')),
                   _buildInfoRow('Payment Method', order.paymentMethod),
                 ],
               ),
@@ -247,7 +260,10 @@ class OrderDetailsScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 16),
                     if (order.deliveryDate != null)
-                      _buildInfoRow('Delivery Date', DateFormat('dd MMM yyyy').format(order.deliveryDate!)),
+                      _buildInfoRow(
+                          'Delivery Date',
+                          DateFormat('dd MMM yyyy')
+                              .format(order.deliveryDate!)),
                     if (order.deliverySlot != null)
                       _buildInfoRow('Delivery Slot', order.deliverySlot!),
                     if (order.shippingAddress != null) ...[
@@ -270,7 +286,8 @@ class OrderDetailsScreen extends StatelessWidget {
                     ],
                     if (order.deliveryInstructions != null) ...[
                       const SizedBox(height: 8),
-                      _buildInfoRow('Instructions', order.deliveryInstructions!),
+                      _buildInfoRow(
+                          'Instructions', order.deliveryInstructions!),
                     ],
                   ],
                 ),
@@ -291,7 +308,8 @@ class OrderDetailsScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 16),
                     if (order.pickupDate != null)
-                      _buildInfoRow('Pickup Date', DateFormat('dd MMM yyyy').format(order.pickupDate!)),
+                      _buildInfoRow('Pickup Date',
+                          DateFormat('dd MMM yyyy').format(order.pickupDate!)),
                     if (order.pickupTimeSlot != null)
                       _buildInfoRow('Pickup Time', order.pickupTimeSlot!),
                     const SizedBox(height: 12),
@@ -427,8 +445,6 @@ class OrderDetailsScreen extends StatelessWidget {
         return Colors.red;
       case PaymentStatus.REFUNDED:
         return Colors.blue;
-      default:
-        return Colors.grey;
     }
   }
 }
