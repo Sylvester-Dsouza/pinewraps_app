@@ -18,10 +18,8 @@ migrate_working_dir/
 *.iws
 .idea/
 
-# The .vscode folder contains launch configuration and tasks you configure in
-# VS Code which you may wish to be included in version control, so this line
-# is commented out by default.
-#.vscode/
+# VS Code related
+.vscode/
 
 # Flutter/Dart/Pub related
 **/doc/api/
@@ -32,6 +30,10 @@ migrate_working_dir/
 .pub-cache/
 .pub/
 /build/
+build/
+**/.dart_tool/
+**/.pub/
+**/build/
 
 # Symbolication related
 app.*.symbols
@@ -43,6 +45,22 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Android related
+**/android/**/gradle-wrapper.jar
+**/android/.gradle
+**/android/captures/
+**/android/gradlew
+**/android/gradlew.bat
+**/android/local.properties
+**/android/**/GeneratedPluginRegistrant.java
+**/android/key.properties
+**/android/app/debug/
+**/android/app/profile/
+**/android/app/release/
+**/android/app/build/
+**/android/app/outputs/
+**/android/app/src/main/java/io/flutter/plugins/
 
 # Firebase configuration files
 google-services.json
@@ -83,10 +101,19 @@ GoogleService-Info.plist
 **/ios/Flutter/flutter_assets/
 **/ios/ServiceDefinitions.json
 **/ios/Runner/GeneratedPluginRegistrant.*
+**/ios/Podfile.lock
 
 # macOS
 **/macos/Flutter/GeneratedPluginRegistrant.swift
 **/macos/Flutter/ephemeral
+**/macos/Pods/
+**/macos/Podfile.lock
+
+# Windows
+**/windows/flutter/ephemeral/
+
+# Web related
+lib/generated_plugin_registrant.dart
 
 # Coverage
 coverage/
@@ -103,8 +130,24 @@ local.properties
 .cxx/
 **/android/.cxx/
 **/android/app/.cxx/
+**/android/app/build/
+**/android/app/build/intermediates/
+**/android/app/build/outputs/
+**/android/app/build/kotlin/
 
 # Keystore files
 *.jks
 *.keystore
 key.properties
+
+# Generated files
+*.g.dart
+*.freezed.dart
+*.config.dart
+
+# Package related
+package-lock.json
+package.json
+
+# Flutter Version Manager
+.fvm/
