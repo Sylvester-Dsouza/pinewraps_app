@@ -3,7 +3,7 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 54;
+	objectVersion = 77;
 	objects = {
 
 /* Begin PBXBuildFile section */
@@ -190,6 +190,7 @@
 				3B06AD1E1E4923F5004D2608 /* Thin Binary */,
 				1BC3C1E9A8AFCEBD3FDC4D41 /* [CP] Embed Pods Frameworks */,
 				C74ABCFEC354770E76C5B079 /* [CP] Copy Pods Resources */,
+				262324712D9FD4D600E93934 /* ShellScript */,
 			);
 			buildRules = (
 			);
@@ -269,14 +270,35 @@
 			inputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-Runner/Pods-Runner-frameworks-${CONFIGURATION}-input-files.xcfilelist",
 			);
+			inputPaths = (
+			);
 			name = "[CP] Embed Pods Frameworks";
 			outputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-Runner/Pods-Runner-frameworks-${CONFIGURATION}-output-files.xcfilelist",
+			);
+			outputPaths = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
 			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-Runner/Pods-Runner-frameworks.sh\"\n";
 			showEnvVarsInLog = 0;
+		};
+		262324712D9FD4D600E93934 /* ShellScript */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "#!/bin/bash\n\n# This script copies the required legacy icons to the built app bundle\n# It should be run as a build phase in Xcode\n\n# Get the path to the built app\nAPP_PATH=\"${BUILT_PRODUCTS_DIR}/${PRODUCT_NAME}.app\"\necho \"Copying icons to: $APP_PATH\"\n\n# Copy the legacy icons to the app bundle\ncp \"${SRCROOT}/Runner/Icon-60@2x.png\" \"${APP_PATH}/Icon-60@2x.png\"\ncp \"${SRCROOT}/Runner/Icon-60@3x.png\" \"${APP_PATH}/Icon-60@3x.png\"\ncp \"${SRCROOT}/Runner/Icon-76.png\" \"${APP_PATH}/Icon-76.png\"\ncp \"${SRCROOT}/Runner/Icon-76@2x.png\" \"${APP_PATH}/Icon-76@2x.png\"\ncp \"${SRCROOT}/Runner/Icon-83.5@2x.png\" \"${APP_PATH}/Icon-83.5@2x.png\"\ncp \"${SRCROOT}/Runner/Icon-Small-40.png\" \"${APP_PATH}/Icon-Small-40.png\"\ncp \"${SRCROOT}/Runner/Icon-Small-40@2x.png\" \"${APP_PATH}/Icon-Small-40@2x.png\"\ncp \"${SRCROOT}/Runner/Icon-Small-40@3x.png\" \"${APP_PATH}/Icon-Small-40@3x.png\"\ncp \"${SRCROOT}/Runner/Icon-Small.png\" \"${APP_PATH}/Icon-Small.png\"\ncp \"${SRCROOT}/Runner/Icon-Small@2x.png\" \"${APP_PATH}/Icon-Small@2x.png\"\ncp \"${SRCROOT}/Runner/Icon-Small@3x.png\" \"${APP_PATH}/Icon-Small@3x.png\"\ncp \"${SRCROOT}/Runner/iTunesArtwork@2x.png\" \"${APP_PATH}/iTunesArtwork@2x.png\"\ncp \"${SRCROOT}/Runner/Icon-Notification.png\" \"${APP_PATH}/Icon-Notification.png\"\ncp \"${SRCROOT}/Runner/Icon-Notification@2x.png\" \"${APP_PATH}/Icon-Notification@2x.png\"\ncp \"${SRCROOT}/Runner/Icon-Notification@3x.png\" \"${APP_PATH}/Icon-Notification@3x.png\"\ncp \"${SRCROOT}/Runner/Icon-120.png\" \"${APP_PATH}/Icon-120.png\"\ncp \"${SRCROOT}/Runner/Icon-152.png\" \"${APP_PATH}/Icon-152.png\"\ncp \"${SRCROOT}/Runner/Icon-167.png\" \"${APP_PATH}/Icon-167.png\"\n\necho \"Legacy icons copied to app bundle\"\n";
 		};
 		3B06AD1E1E4923F5004D2608 /* Thin Binary */ = {
 			isa = PBXShellScriptBuildPhase;
@@ -329,7 +351,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "/bin/sh \"$FLUTTER_ROOT/packages/flutter_tools/bin/xcode_backend.sh\" build";
+			shellScript = "/bin/sh \"$FLUTTER_ROOT/packages/flutter_tools/bin/xcode_backend.sh\" build\n";
 		};
 		C74ABCFEC354770E76C5B079 /* [CP] Copy Pods Resources */ = {
 			isa = PBXShellScriptBuildPhase;
@@ -339,9 +361,13 @@
 			inputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-Runner/Pods-Runner-resources-${CONFIGURATION}-input-files.xcfilelist",
 			);
+			inputPaths = (
+			);
 			name = "[CP] Copy Pods Resources";
 			outputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-Runner/Pods-Runner-resources-${CONFIGURATION}-output-files.xcfilelist",
+			);
+			outputPaths = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
@@ -457,9 +483,10 @@
 			baseConfigurationReference = 7AFA3C8E1D35360C0083082E /* Release.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = "$(FLUTTER_BUILD_NUMBER)";
+				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 4J9WXB52YV;
 				ENABLE_BITCODE = NO;
 				EXCLUDED_SOURCE_FILE_NAMES = (
@@ -473,11 +500,13 @@
 					"\"${PODS_ROOT}/Headers/Public/Flutter\"",
 				);
 				INFOPLIST_FILE = Runner/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "Pine Wraps";
 				IPHONEOS_DEPLOYMENT_TARGET = 12.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
+				MARKETING_VERSION = 1.0.2;
 				PRODUCT_BUNDLE_IDENTIFIER = com.pinewraps.app;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_OBJC_BRIDGING_HEADER = "Runner/Runner-Bridging-Header.h";
@@ -670,12 +699,13 @@
 			baseConfigurationReference = 9740EEB21CF90195004384FC /* Debug.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ALLOW_ENTITLEMENTS_MODIFICATION = YES;
 				CODE_SIGN_ENTITLEMENTS = Runner/Runner.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = YES;
-				CURRENT_PROJECT_VERSION = "$(FLUTTER_BUILD_NUMBER)";
+				CURRENT_PROJECT_VERSION = 1;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = 4J9WXB52YV;
 				ENABLE_BITCODE = NO;
@@ -694,6 +724,7 @@
 					"PERMISSION_MICROPHONE=1",
 				);
 				INFOPLIST_FILE = Runner/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "Pine Wraps";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.shopping";
 				INFOPLIST_KEY_NSCameraUsageDescription = "This app needs camera access to scan QR codes and take photos for uploads";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "This app needs access to location when open to provide location-based notifications";
@@ -704,6 +735,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
+				MARKETING_VERSION = 1.0.2;
 				OTHER_LDFLAGS = (
 					"$(inherited)",
 					"-framework",
@@ -725,12 +757,13 @@
 			baseConfigurationReference = 7AFA3C8E1D35360C0083082E /* Release.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ALLOW_ENTITLEMENTS_MODIFICATION = YES;
 				CODE_SIGN_ENTITLEMENTS = Runner/Runner.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = YES;
-				CURRENT_PROJECT_VERSION = "$(FLUTTER_BUILD_NUMBER)";
+				CURRENT_PROJECT_VERSION = 1;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = 4J9WXB52YV;
 				ENABLE_BITCODE = NO;
@@ -749,6 +782,7 @@
 					"PERMISSION_MICROPHONE=1",
 				);
 				INFOPLIST_FILE = Runner/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "Pine Wraps";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.shopping";
 				INFOPLIST_KEY_NSCameraUsageDescription = "This app needs camera access to scan QR codes and take photos for uploads";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "This app needs access to location when open to provide location-based notifications";
@@ -759,6 +793,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
+				MARKETING_VERSION = 1.0.2;
 				OTHER_LDFLAGS = (
 					"$(inherited)",
 					"-framework",

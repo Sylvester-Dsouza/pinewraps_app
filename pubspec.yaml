@@ -77,7 +77,11 @@ flutter_launcher_icons:
   remove_alpha_ios: true
   image_path: "assets/images/Launcher.png"
   adaptive_icon_background: "#FFFFFF"
+  adaptive_icon_foreground: "assets/images/Launcher.png"
   min_sdk_android: 21
+  ios_content_mode: scaleAspectFit
+  # Explicitly define iOS icon sizes
+  ios_launcher_icon_sizes: [20, 29, 40, 60, 76, 83.5, 1024]
   web:
     generate: true
     image_path: "assets/images/Launcher.png"
