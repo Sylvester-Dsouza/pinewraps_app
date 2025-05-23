@@ -14,11 +14,43 @@
       },
       "oauth_client": [
         {
+          "client_id": "181991178384-a29b3soar61egr7qvflqda7tagr2hvbo.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.pinewraps.app",
+            "certificate_hash": "3f2561671edad16ab170b2fec3942b033660b37f"
+          }
+        },
+        {
           "client_id": "181991178384-egso4atj877ghd4c2tgiv9rg2c15715o.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
             "package_name": "com.pinewraps.app",
             "certificate_hash": "36cee120eaaec671fe14f945545cb9f027204274"
+          }
+        },
+        {
+          "client_id": "181991178384-jgmvu2g3ouambvhh2j25tp52kj6oecth.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.pinewraps.app",
+            "certificate_hash": "f8530d07f0854a6b43a196ca74db698d140ce928"
+          }
+        },
+        {
+          "client_id": "181991178384-neb33u5kdab1llo22avoj0pt5d220n46.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.pinewraps.app",
+            "certificate_hash": "3e2972bdb743c58f10a5f6ae4530cebada876580"
+          }
+        },
+        {
+          "client_id": "181991178384-o03u7s3139jh4vi0353195t7g7kq36is.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.pinewraps.app",
+            "certificate_hash": "7a115f6b99bad24afbc5394f2723ee1a9ffd2f26"
           }
         },
         {

@@ -1,9 +1,10 @@
-import 'dart:convert';
 import 'dart:io';
 import 'dart:async';
+import 'dart:convert';
 import 'dart:math';
 import 'package:http/http.dart' as http;
 import '../models/product.dart';
+import '../models/product_addon.dart';
 import '../config/environment.dart';
 import '../services/api_service.dart' as api; // Import ApiService with alias
 
@@ -280,10 +281,16 @@ class ProductService {
 
   Future<List<ProductCategory>> getCategories() async {
     try {
-      final uri = Uri.parse('$baseUrl/categories/public');
+      // Specify APP platform to get appropriate categories based on visibility
+      final uri = Uri.parse('$baseUrl/categories/public?platform=APP');
       print('Fetching categories from: $uri');
       
-      final response = await http.get(uri).timeout(
+      final response = await http.get(
+        uri,
+        headers: {
+          'X-Platform': 'APP',
+        },
+      ).timeout(
         const Duration(seconds: 15),
         onTimeout: () {
           throw TimeoutException('Connection timed out. Please check your server settings and internet connection.');
@@ -350,6 +357,52 @@ class ProductService {
     } catch (e) {
       print('Error fetching categories: $e');
       throw Exception('Failed to get categories: $e');
+    }
+  }
+  
+  // Get product addons for a specific product
+  Future<List<ProductAddon>> fetchProductAddons(String productId) async {
+    try {
+      final uri = Uri.parse('$baseUrl/products/public/$productId/addons');
+      print('Fetching product addons from: $uri');
+      
+      final response = await http.get(uri).timeout(
+        const Duration(seconds: 15),
+        onTimeout: () {
+          throw TimeoutException('Connection timed out. Please check your server settings and internet connection.');
+        },
+      );
+      
+      print('Response status code: ${response.statusCode}');
+      
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> jsonResponse = json.decode(response.body);
+        
+        if (jsonResponse['success'] == true && jsonResponse['data'] != null) {
+          final addonsData = jsonResponse['data'] as List<dynamic>;
+          
+          print('Received ${addonsData.length} product addons');
+          return addonsData
+              .map((json) => ProductAddon.fromJson(json as Map<String, dynamic>))
+              .toList();
+        } else {
+          print('Invalid API response format: $jsonResponse');
+          return []; // Return empty list instead of throwing exception
+        }
+      } else {
+        print('Failed to load product addons: ${response.statusCode}');
+        print('Response body: ${response.body}');
+        return []; // Return empty list instead of throwing exception
+      }
+    } on SocketException catch (e) {
+      print('SocketException when fetching product addons: $e');
+      return []; // Return empty list instead of throwing exception
+    } on TimeoutException catch (_) {
+      print('Timeout when fetching product addons');
+      return []; // Return empty list instead of throwing exception
+    } catch (e) {
+      print('Error fetching product addons: $e');
+      return []; // Return empty list instead of throwing exception
     }
   }
 }

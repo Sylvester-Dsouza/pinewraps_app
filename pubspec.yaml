@@ -16,7 +16,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 1.0.2+3
+version: 1.0.5+7
 
 environment:
   sdk: '>=3.2.3 <4.0.0'
@@ -31,9 +31,10 @@ dependencies:
   flutter:
     sdk: flutter
   cupertino_icons: ^1.0.2
-  firebase_core: ^3.12.1
+  firebase_core: ^3.13.0
   firebase_auth: ^5.5.2
   firebase_messaging: ^15.2.5
+  firebase_analytics: ^11.4.5
   google_sign_in: ^6.2.1
   http: ^1.1.0
   shared_preferences: ^2.2.2
@@ -49,6 +50,7 @@ dependencies:
   webview_flutter: ^4.4.2
   webview_flutter_android: ^3.13.1
   webview_flutter_wkwebview: ^3.9.4
+  facebook_app_events: ^0.19.0
   app_links: ^3.4.5
   path_provider: ^2.1.1
   # open_file: ^3.3.2  # Temporarily commented out due to macOS plugin issues
@@ -61,6 +63,8 @@ dependencies:
   flutter_signin_button: ^2.0.0
   flutter_html: ^3.0.0-beta.2
   html: ^0.15.4
+  app_tracking_transparency: ^2.0.4
+  intl_phone_field: ^3.2.0  # For phone number with country code selector
   # Database
   # sqflite: ^2.4.2  # Temporarily commented out
   # sqflite_common: ^2.5.5  # Temporarily commented out
@@ -69,31 +73,13 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^2.0.0
-  flutter_launcher_icons: ^0.13.1
+  flutter_launcher_icons: ^0.14.3
 
 flutter_launcher_icons:
   android: true
   ios: true
-  remove_alpha_ios: true
   image_path: "assets/images/Launcher.png"
-  adaptive_icon_background: "#FFFFFF"
-  adaptive_icon_foreground: "assets/images/Launcher.png"
-  min_sdk_android: 21
-  ios_content_mode: scaleAspectFit
-  # Explicitly define iOS icon sizes
-  ios_launcher_icon_sizes: [20, 29, 40, 60, 76, 83.5, 1024]
-  web:
-    generate: true
-    image_path: "assets/images/Launcher.png"
-    background_color: "#FFFFFF"
-    theme_color: "#FFFFFF"
-  windows:
-    generate: true
-    image_path: "assets/images/Launcher.png"
-    icon_size: 48
-  macos:
-    generate: true
-    image_path: "assets/images/Launcher.png"
+  
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec

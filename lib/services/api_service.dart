@@ -2,8 +2,10 @@
 
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math' as math;
 import 'package:dio/dio.dart';
 import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
+
 import 'package:shared_preferences/shared_preferences.dart';
 import '../config/environment.dart';
 import '../models/customer_details.dart';
@@ -255,8 +257,7 @@ class ApiService {
 
       // Cache the email
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(
-          'customer_email', _cachedCustomerDetails!.email);
+      await prefs.setString('customer_email', _cachedCustomerDetails!.email);
 
       if (response.statusCode == 201 || response.statusCode == 200) {
         // Handle successful response
@@ -368,7 +369,8 @@ class ApiService {
         };
       } else {
         // Convert any other response type to a basic success map
-        print('Response is ${response.data.runtimeType}, converting to basic Map');
+        print(
+            'Response is ${response.data.runtimeType}, converting to basic Map');
         return {
           'email': email,
           'message': 'Logged in successfully',
@@ -376,7 +378,7 @@ class ApiService {
       }
     } catch (e) {
       print('Login API Error: $e');
-      
+
       // Create a fallback response with basic user info
       final user = firebase_auth.FirebaseAuth.instance.currentUser;
       if (user != null) {
@@ -390,7 +392,7 @@ class ApiService {
           'message': 'Logged in successfully',
         };
       }
-      
+
       if (e is DioException) {
         throw ApiException(
           message: e.response?.data?['message'] ?? 'Login failed',
@@ -420,6 +422,14 @@ class ApiService {
       print('Sending social auth request to: $_baseUrl/customer-auth/social');
       print('Provider: $provider, Email: $email');
       print('Token available: ${token.isNotEmpty}');
+      print('Token length: ${token.length}');
+
+      // Print the first and last 10 characters of the token for debugging
+      if (token.length > 20) {
+        final tokenStart = token.substring(0, 10);
+        final tokenEnd = token.substring(token.length - 10);
+        print('Token snippet: $tokenStart....$tokenEnd');
+      }
 
       final data = {
         'token': token,
@@ -431,26 +441,59 @@ class ApiService {
         'phone': phone,
       };
 
-      print('Request data: $data');
+      print('Request data prepared');
 
+      // Set timeout options for the request
+      final options = Options(
+        contentType: Headers.jsonContentType,
+        validateStatus: (status) =>
+            true, // Allow any status code for better error handling
+        headers: {
+          'Authorization': 'Bearer $token',
+        },
+        sendTimeout: const Duration(seconds: 30),
+        receiveTimeout: const Duration(seconds: 30),
+      );
+
+      print('Sending request to backend...');
       final response = await _dio.post(
         '/customer-auth/social',
         data: data,
-        options: Options(
-          contentType: Headers.jsonContentType,
-          validateStatus: (status) =>
-              true, // Allow any status code for better error handling
-          headers: {
-            'Authorization': 'Bearer $token',
-          },
-        ),
+        options: options,
       );
 
+      print('Social auth response received');
       print('Social auth response status: ${response.statusCode}');
-      print('Response data: ${response.data}');
+      if (response.data != null) {
+        print('Response contains data');
+      } else {
+        print('Response data is null');
+      }
 
+      // Check for successful response
       if (response.statusCode == 200 && response.data != null) {
-        if (response.data['data'] == null) {
+        print('Successful response (200)');
+
+        // Check response structure
+        if (response.data is! Map) {
+          print('Response is not a Map: ${response.data.runtimeType}');
+          throw ApiException(
+            message: 'Invalid response format from server: not a Map',
+            statusCode: 500,
+          );
+        }
+
+        final responseMap = response.data as Map;
+
+        // Check for success flag
+        if (responseMap['success'] == true) {
+          print('Response success flag is true');
+        } else {
+          print('Response success flag is not true: ${responseMap['success']}');
+        }
+
+        // Check for data field
+        if (responseMap['data'] == null) {
           print('Invalid response format - missing data field');
           throw ApiException(
             message: 'Invalid response format from server: missing data field',
@@ -458,74 +501,135 @@ class ApiService {
           );
         }
 
-        // Double check the data structure
-        final responseData = response.data['data'];
-        print('Parsed response data: $responseData');
+        // Process the data
+        final responseData = responseMap['data'];
+        print('Response data type: ${responseData.runtimeType}');
 
         // Make sure the token in the response is stored
         if (responseData is Map && responseData['token'] != null) {
           final newToken = responseData['token'];
-          print('New token received from server');
+          print('New token received from server, length: ${newToken.length}');
           await _setCachedFirebaseToken(newToken);
         }
 
-        return response.data['data'];
+        // Check if customer data is present
+        if (responseData is Map && responseData['customer'] != null) {
+          print('Customer data received: ${responseData['customer']}');
+        }
+
+        return responseMap['data'];
       }
 
-      // More detailed error handling
+      // Handle error responses
       String errorMessage = 'Social authentication failed';
       int statusCode = response.statusCode ?? 500;
 
+      print('Error response status code: $statusCode');
+
       if (response.data is Map) {
         final errorData = response.data as Map;
+        print('Error data structure: ${errorData.keys}');
+
         if (errorData['error'] is Map) {
           final error = errorData['error'] as Map;
           errorMessage = error['message'] ?? errorMessage;
+          print('Detailed error message: $errorMessage');
+
           if (error['code'] != null) {
             print('Error code from server: ${error['code']}');
           }
         } else if (errorData['message'] != null) {
           errorMessage = errorData['message'];
+          print('Simple error message: $errorMessage');
         }
+      } else {
+        print('Error response is not a Map: ${response.data}');
       }
 
-      print('Error response: $errorMessage (status: $statusCode)');
+      print('Throwing API exception: $errorMessage (status: $statusCode)');
       throw ApiException(
         message: errorMessage,
         statusCode: statusCode,
       );
     } catch (e) {
       print('Social Auth Error: $e');
+
+      // Handle Dio-specific errors
       if (e is DioException) {
         print('Dio error type: ${e.type}');
         print('Dio error message: ${e.message}');
-        if (e.response != null) {
-          print('Response status: ${e.response?.statusCode}');
-          print('Response data: ${e.response?.data}');
+
+        // Handle different Dio error types
+        switch (e.type) {
+          case DioExceptionType.connectionTimeout:
+            print('Connection timeout error');
+            throw ApiException(
+              message:
+                  'Connection timeout while contacting authentication server',
+              statusCode: 408,
+            );
+          case DioExceptionType.sendTimeout:
+            print('Send timeout error');
+            throw ApiException(
+              message: 'Send timeout while contacting authentication server',
+              statusCode: 408,
+            );
+          case DioExceptionType.receiveTimeout:
+            print('Receive timeout error');
+            throw ApiException(
+              message: 'Receive timeout while contacting authentication server',
+              statusCode: 408,
+            );
+          case DioExceptionType.badResponse:
+            // Handle server response errors
+            if (e.response != null) {
+              print('Response status: ${e.response?.statusCode}');
+              print('Response data: ${e.response?.data}');
+
+              final responseData = e.response?.data;
+              String errorMessage = 'Social authentication failed';
+
+              if (responseData is Map) {
+                if (responseData['error'] is Map) {
+                  final error = responseData['error'] as Map;
+                  errorMessage = error['message'] ?? errorMessage;
+                } else if (responseData['message'] != null) {
+                  errorMessage = responseData['message'];
+                }
+              }
+
+              throw ApiException(
+                message: errorMessage,
+                statusCode: e.response?.statusCode ?? 500,
+              );
+            }
+            break;
+          case DioExceptionType.cancel:
+            print('Request was cancelled');
+            throw ApiException(
+              message: 'Authentication request was cancelled',
+              statusCode: 499,
+            );
+          default:
+            // Handle other Dio errors
+            print('Other Dio error');
+            if (e.message != null) {
+              throw ApiException(
+                message: 'Network error: ${e.message}',
+                statusCode: 500,
+              );
+            }
         }
-
-        final responseData = e.response?.data;
-        String errorMessage = 'Social authentication failed';
-
-        if (responseData is Map) {
-          if (responseData['error'] is Map) {
-            final error = responseData['error'] as Map;
-            errorMessage = error['message'] ?? errorMessage;
-          } else if (responseData['message'] != null) {
-            errorMessage = responseData['message'];
-          }
-        } else if (e.message != null) {
-          errorMessage = e.message!;
-        }
-
-        throw ApiException(
-          message: errorMessage,
-          statusCode: e.response?.statusCode ?? 500,
-        );
       }
+
+      // Re-throw ApiExceptions
       if (e is ApiException) {
+        print('Re-throwing ApiException');
         rethrow;
       }
+
+      // Handle any other errors
+      print('Throwing general error');
       throw ApiException(
         message: 'Social authentication failed: ${e.toString()}',
         statusCode: 500,
@@ -533,9 +637,25 @@ class ApiService {
     }
   }
 
-  Future<CustomerDetails> getCustomerDetails() async {
+  // Clear customer details cache to force a fresh fetch
+  void clearCustomerDetailsCache() {
+    print('Clearing customer details cache');
+    _cachedCustomerDetails = null;
+    _cachedCustomerDetailsTime = null;
+    _cachedRewardPoints = null;
+  }
+
+  Future<CustomerDetails> getCustomerDetails(
+      {bool forceRefresh = false}) async {
+    // Clear cache if force refresh is requested
+    if (forceRefresh) {
+      clearCustomerDetailsCache();
+    }
+
     // Return cached customer details if available and not expired
-    if (_cachedCustomerDetails != null && _cachedCustomerDetailsTime != null) {
+    if (!forceRefresh &&
+        _cachedCustomerDetails != null &&
+        _cachedCustomerDetailsTime != null) {
       final cacheDuration =
           DateTime.now().difference(_cachedCustomerDetailsTime!);
       if (cacheDuration < const Duration(minutes: 5)) {
@@ -587,13 +707,92 @@ class ApiService {
         }
 
         // Ensure we have the email from the current cached details if not in response
-        if (!customerData.containsKey('email') || customerData['email'] == null) {
+        if (!customerData.containsKey('email') ||
+            customerData['email'] == null) {
           if (_cachedCustomerDetails != null) {
             customerData['email'] = _cachedCustomerDetails!.email;
           } else if (_cachedCustomerEmail != null) {
             customerData['email'] = _cachedCustomerEmail;
           }
         }
+
+        // Debug reward points data
+        print('Raw customer data: ${json.encode(customerData)}');
+
+        // Ensure reward points are properly extracted
+        int rewardPoints = 0;
+
+        print('Extracting reward points from customer data...');
+
+        // STEP 1: First check direct rewardPoints field on Customer model
+        if (customerData.containsKey('rewardPoints')) {
+          if (customerData['rewardPoints'] is int) {
+            rewardPoints = customerData['rewardPoints'];
+            print('Found direct rewardPoints on Customer model: $rewardPoints');
+          } else if (customerData['rewardPoints'] is String) {
+            rewardPoints = int.tryParse(customerData['rewardPoints']) ?? 0;
+            print(
+                'Found direct rewardPoints (string) on Customer model: $rewardPoints');
+          }
+        }
+
+        // STEP 2: Check for points in the nested reward object (CustomerReward model)
+        if (customerData.containsKey('reward') &&
+            customerData['reward'] != null) {
+          var rewardData = customerData['reward'];
+          print('Found reward data: ${json.encode(rewardData)}');
+
+          // If we have a reward object, use its points value (this should be the most accurate)
+          if (rewardData is Map<String, dynamic>) {
+            if (rewardData.containsKey('points')) {
+              if (rewardData['points'] is int) {
+                // Override with reward.points as it's more accurate
+                rewardPoints = rewardData['points'];
+                print('Found points in CustomerReward model: $rewardPoints');
+              } else if (rewardData['points'] is String) {
+                int? parsedPoints = int.tryParse(rewardData['points']);
+                if (parsedPoints != null) {
+                  // Override with reward.points as it's more accurate
+                  rewardPoints = parsedPoints;
+                  print(
+                      'Found points (string) in CustomerReward model: $rewardPoints');
+                }
+              }
+            }
+
+            // If points is still 0, try totalPoints as a fallback
+            if (rewardPoints == 0 &&
+                rewardData.containsKey('totalPoints') &&
+                rewardData['totalPoints'] != null) {
+              if (rewardData['totalPoints'] is int &&
+                  rewardData['totalPoints'] > 0) {
+                rewardPoints = rewardData['totalPoints'];
+                print(
+                    'Using totalPoints from CustomerReward model: $rewardPoints');
+              } else if (rewardData['totalPoints'] is String) {
+                int? parsedPoints = int.tryParse(rewardData['totalPoints']);
+                if (parsedPoints != null && parsedPoints > 0) {
+                  rewardPoints = parsedPoints;
+                  print(
+                      'Using totalPoints (string) from CustomerReward model: $rewardPoints');
+                }
+              }
+            }
+          }
+        }
+
+        // Do not set default points - only use actual points from the database
+        // This ensures we only show the logged-in customer's actual points
+        if (rewardPoints == 0) {
+          print('Customer has 0 reward points');
+        }
+
+        // Cache the reward points separately
+        _cachedRewardPoints = rewardPoints;
+        print('Final extracted reward points: $rewardPoints');
+
+        // Ensure reward points are included in the customer data
+        customerData['rewardPoints'] = rewardPoints;
 
         // Create new customer details and update cache
         _cachedCustomerDetails = CustomerDetails.fromJson(customerData);
@@ -649,6 +848,92 @@ class ApiService {
                       statusCode: 500,
                     );
                   }
+
+                  // Debug retry response data
+                  print(
+                      'Retry response customer data: ${json.encode(customerData)}');
+
+                  // Ensure reward points are properly extracted in retry response
+                  int rewardPoints = 0;
+
+                  print(
+                      'Retry: Extracting reward points from customer data...');
+
+                  // STEP 1: First check direct rewardPoints field on Customer model
+                  if (customerData.containsKey('rewardPoints')) {
+                    if (customerData['rewardPoints'] is int) {
+                      rewardPoints = customerData['rewardPoints'];
+                      print(
+                          'Retry: Found direct rewardPoints on Customer model: $rewardPoints');
+                    } else if (customerData['rewardPoints'] is String) {
+                      rewardPoints =
+                          int.tryParse(customerData['rewardPoints']) ?? 0;
+                      print(
+                          'Retry: Found direct rewardPoints (string) on Customer model: $rewardPoints');
+                    }
+                  }
+
+                  // STEP 2: Check for points in the nested reward object (CustomerReward model)
+                  if (customerData.containsKey('reward') &&
+                      customerData['reward'] != null) {
+                    var rewardData = customerData['reward'];
+                    print(
+                        'Retry: Found reward data: ${json.encode(rewardData)}');
+
+                    // If we have a reward object, use its points value (this should be the most accurate)
+                    if (rewardData is Map<String, dynamic>) {
+                      if (rewardData.containsKey('points')) {
+                        if (rewardData['points'] is int) {
+                          // Override with reward.points as it's more accurate
+                          rewardPoints = rewardData['points'];
+                          print(
+                              'Retry: Found points in CustomerReward model: $rewardPoints');
+                        } else if (rewardData['points'] is String) {
+                          int? parsedPoints =
+                              int.tryParse(rewardData['points']);
+                          if (parsedPoints != null) {
+                            // Override with reward.points as it's more accurate
+                            rewardPoints = parsedPoints;
+                            print(
+                                'Retry: Found points (string) in CustomerReward model: $rewardPoints');
+                          }
+                        }
+                      }
+
+                      // If points is still 0, try totalPoints as a fallback
+                      if (rewardPoints == 0 &&
+                          rewardData.containsKey('totalPoints') &&
+                          rewardData['totalPoints'] != null) {
+                        if (rewardData['totalPoints'] is int &&
+                            rewardData['totalPoints'] > 0) {
+                          rewardPoints = rewardData['totalPoints'];
+                          print(
+                              'Retry: Using totalPoints from CustomerReward model: $rewardPoints');
+                        } else if (rewardData['totalPoints'] is String) {
+                          int? parsedPoints =
+                              int.tryParse(rewardData['totalPoints']);
+                          if (parsedPoints != null && parsedPoints > 0) {
+                            rewardPoints = parsedPoints;
+                            print(
+                                'Retry: Using totalPoints (string) from CustomerReward model: $rewardPoints');
+                          }
+                        }
+                      }
+                    }
+                  }
+
+                  // Do not set default points - only use actual points from the database
+                  // This ensures we only show the logged-in customer's actual points
+                  if (rewardPoints == 0) {
+                    print('Retry: Customer has 0 reward points');
+                  }
+
+                  // Cache the reward points separately
+                  _cachedRewardPoints = rewardPoints;
+                  print('Retry: Final extracted reward points: $rewardPoints');
+
+                  // Ensure reward points are included in the customer data
+                  customerData['rewardPoints'] = rewardPoints;
 
                   _cachedCustomerDetails =
                       CustomerDetails.fromJson(customerData);
@@ -835,8 +1120,7 @@ class ApiService {
 
   Future<List<Address>> getSavedAddresses() async {
     if (_addressesCache != null && _addressesCacheTime != null) {
-      final cacheDuration =
-          DateTime.now().difference(_addressesCacheTime!);
+      final cacheDuration = DateTime.now().difference(_addressesCacheTime!);
       if (cacheDuration < const Duration(minutes: 5)) {
         return _addressesCache!;
       }
@@ -936,8 +1220,7 @@ class ApiService {
       }
 
       throw ApiException(
-        message: response.data?['error']?['message'] ??
-            'Failed to add address',
+        message: response.data?['error']?['message'] ?? 'Failed to add address',
         statusCode: response.statusCode ?? 500,
       );
     } on DioException catch (e) {
@@ -1388,12 +1671,93 @@ class ApiService {
   }
 
   // Rewards API endpoints
+  // Cache for customer rewards
+  CustomerReward? _cachedCustomerReward;
+  DateTime? _cachedCustomerRewardTime;
+
+  void clearRewardsCache() {
+    print('Clearing rewards cache');
+    _cachedCustomerReward = null;
+    _cachedCustomerRewardTime = null;
+  }
+
   Future<CustomerReward?> getCustomerRewards() async {
     try {
-      final response = await _dio.get('$_baseUrl/rewards');
-      if (response.statusCode == 200 && response.data['success'] == true) {
-        return CustomerReward.fromJson(response.data['data']);
+      // Check if we have a cached reward that's less than 5 minutes old
+      final now = DateTime.now();
+      if (_cachedCustomerReward != null && _cachedCustomerRewardTime != null) {
+        final difference = now.difference(_cachedCustomerRewardTime!);
+        if (difference.inMinutes < 5) {
+          print(
+              'Using cached customer reward: ${_cachedCustomerReward!.points} points');
+          return _cachedCustomerReward;
+        }
       }
+
+      // Get a fresh token
+      final token = await _getCachedFirebaseToken();
+      if (token == null) {
+        print('No token available for fetching rewards');
+        return null;
+      }
+
+      print('Fetching customer rewards directly from rewards endpoint');
+      print('Base URL: $_baseUrl');
+      print('Token: ${token.substring(0, math.min(10, token.length))}...');
+
+      // Configure Dio for this request
+      final dio = Dio();
+      dio.options.baseUrl = _baseUrl;
+      dio.options.headers['Authorization'] = 'Bearer $token';
+      dio.options.headers['Content-Type'] = 'application/json';
+
+      // Make the request
+      final response = await dio.get('/rewards');
+      print('Rewards response status: ${response.statusCode}');
+      print('Rewards response data: ${json.encode(response.data)}');
+
+      if (response.statusCode == 200 && response.data['success'] == true) {
+        final rewardData = response.data['data'];
+        print('Reward data: ${json.encode(rewardData)}');
+
+        if (rewardData != null) {
+          // Create a CustomerReward object from the response data
+          final customerReward = CustomerReward.fromJson(rewardData);
+
+          // Cache the reward data
+          _cachedCustomerReward = customerReward;
+          _cachedCustomerRewardTime = DateTime.now();
+          print('Cached customer reward with ${customerReward.points} points');
+
+          // Update cached reward points
+          _cachedRewardPoints = customerReward.points;
+          print('Updated cached reward points: ${customerReward.points}');
+
+          // If we have customer details cached, update them with the reward points
+          if (_cachedCustomerDetails != null) {
+            _cachedCustomerDetails = CustomerDetails(
+              id: _cachedCustomerDetails!.id,
+              firstName: _cachedCustomerDetails!.firstName,
+              lastName: _cachedCustomerDetails!.lastName,
+              email: _cachedCustomerDetails!.email,
+              phone: _cachedCustomerDetails!.phone,
+              birthDate: _cachedCustomerDetails!.birthDate,
+              isEmailVerified: _cachedCustomerDetails!.isEmailVerified,
+              rewardPoints: customerReward.points,
+              rewardTier: customerReward.tier.toString().split('.').last,
+              imageUrl: _cachedCustomerDetails!.imageUrl,
+              provider: _cachedCustomerDetails!.provider,
+            );
+            _cachedCustomerDetailsTime = DateTime.now();
+            print(
+                'Updated cached customer details with reward points: ${customerReward.points}');
+          }
+
+          return customerReward;
+        }
+      }
+
+      print('Failed to fetch rewards: ${response.statusCode}');
       return null;
     } catch (e) {
       print('Error fetching customer rewards: $e');

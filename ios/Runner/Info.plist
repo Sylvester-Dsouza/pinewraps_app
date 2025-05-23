@@ -10,33 +10,6 @@
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
 	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
-	<key>CFBundleIconName</key>
-	<string>AppIcon</string>
-	<key>CFBundleIcons</key>
-	<dict>
-		<key>CFBundlePrimaryIcon</key>
-		<dict>
-			<key>CFBundleIconFiles</key>
-			<array>
-				<string>Icon-Small</string>
-				<string>Icon-Small@2x</string>
-				<string>Icon-Small@3x</string>
-				<string>Icon-Small-40</string>
-				<string>Icon-Small-40@2x</string>
-				<string>Icon-Small-40@3x</string>
-				<string>Icon-60@2x</string>
-				<string>Icon-60@3x</string>
-				<string>Icon-76</string>
-				<string>Icon-76@2x</string>
-				<string>Icon-83.5@2x</string>
-				<string>Icon-120</string>
-				<string>Icon-152</string>
-				<string>Icon-167</string>
-			</array>
-			<key>UIPrerenderedIcon</key>
-			<false/>
-		</dict>
-	</dict>
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
@@ -47,6 +20,10 @@
 	<string>$(FLUTTER_BUILD_NAME)</string>
 	<key>CFBundleSignature</key>
 	<string>????</string>
+	<key>CFBundleIconName</key>
+	<string>AppIcons</string>
+	<key>CFBundleIconFile</key>
+	<string>AppIcons</string>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>
@@ -64,7 +41,15 @@
 	<array>
 		<string>https</string>
 		<string>http</string>
+		<string>fbapi</string>
+		<string>fb-messenger-share-api</string>
 	</array>
+	<key>FacebookAppID</key>
+	<string>455351257582005</string>
+	<key>FacebookClientToken</key>
+	<string>0a79a71266e92ed7ab55033dc43c9101</string>
+	<key>FacebookDisplayName</key>
+	<string>Pinewraps</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
@@ -93,26 +78,16 @@
 	</array>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
-
-	<!-- Camera Usage -->
 	<key>NSCameraUsageDescription</key>
 	<string>This app needs camera access to scan QR codes and take photos for uploads</string>
-
-	<!-- Photo Library Usage -->
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>This app needs access to photo library for uploading images</string>
-
-	<!-- Location Usage -->
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>This app needs access to location when open to provide location-based notifications</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
 	<string>This app needs access to location to provide location-based notifications</string>
-
-	<!-- Microphone Usage -->
 	<key>NSMicrophoneUsageDescription</key>
 	<string>This app needs microphone access for voice input in web content</string>
-
-	<!-- Network Access -->
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsArbitraryLoads</key>
@@ -120,19 +95,17 @@
 		<key>NSAllowsArbitraryLoadsInWebContent</key>
 		<true/>
 	</dict>
-
-	<!-- Document Access -->
 	<key>UISupportsDocumentBrowser</key>
 	<true/>
 	<key>LSSupportsOpeningDocumentsInPlace</key>
 	<true/>
 	<key>NSDocumentsFolderUsageDescription</key>
 	<string>This app needs access to documents for file operations</string>
-
-	<!-- App Settings -->
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<false/>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
+	<key>NSUserTrackingUsageDescription</key>
+	<string>This will be used to deliver personalized ads and product recommendations to you and improve your shopping experience.</string>
 </dict>
 </plist>

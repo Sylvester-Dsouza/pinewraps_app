@@ -15,6 +15,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 class AuthService extends ChangeNotifier {
   final FirebaseAuth _auth = FirebaseAuth.instance;
+  // Initialize GoogleSignIn with required scopes for Firebase authentication
   final GoogleSignIn _googleSignIn = GoogleSignIn();
   final ApiService _apiService = ApiService();
   final CartService _cartService = CartService();
@@ -203,7 +204,7 @@ class AuthService extends ChangeNotifier {
     required String password,
     required String firstName,
     required String lastName,
-    required String phone,
+    String phone = '', // Phone is now optional with empty default
   }) async {
     UserCredential? userCredential;
     
@@ -352,12 +353,34 @@ class AuthService extends ChangeNotifier {
     try {
       // First sign out to ensure a fresh sign-in
       print('Signing out from previous sessions...');
-      await _googleSignIn.signOut();
-      await _auth.signOut();
+      try {
+        await _googleSignIn.signOut();
+        await _auth.signOut();
+      } catch (signOutError) {
+        print('Error during sign out: $signOutError');
+        // Continue with sign-in even if sign-out fails
+      }
       
-      // Step 1: Google Sign In
+      // Step 1: Google Sign In with error handling
       print('Starting Google Sign In flow...');
-      final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
+      GoogleSignInAccount? googleUser;
+      try {
+        // Try to sign in
+        googleUser = await _googleSignIn.signIn();
+      } catch (error) {
+        print('Google Sign In error caught: $error');
+        if (error.toString().contains('ApiException: 10:')) {
+          throw ApiException(
+            message: 'Google Sign In failed due to configuration issue. Please check your internet connection and try again.',
+            statusCode: 400,
+          );
+        }
+        throw ApiException(
+          message: 'Google sign-in failed: ${error.toString()}',
+          statusCode: 401,
+        );
+      }
+      
       if (googleUser == null) {
         print('Google Sign In was cancelled by user');
         throw ApiException(
@@ -367,38 +390,80 @@ class AuthService extends ChangeNotifier {
       }
       
       print('Google Sign In successful: ${googleUser.email}');
-
+      
       // Step 2: Get auth details
       print('Getting Google authentication tokens...');
-      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
-      if (googleAuth.accessToken == null || googleAuth.idToken == null) {
-        print('Failed to get Google authentication tokens');
+      GoogleSignInAuthentication? googleAuth;
+      
+      try {
+        // Get authentication tokens
+        googleAuth = await googleUser.authentication;
+        
+        // Check if we have the tokens we need
+        if (googleAuth.idToken == null) {
+          print('ID token is null - using direct Firebase credential');
+          
+          // Try to sign in directly with Firebase
+          final AuthCredential credential = GoogleAuthProvider.credential(
+            accessToken: googleAuth.accessToken,
+          );
+          
+          // Sign in to Firebase directly
+          await _auth.signInWithCredential(credential);
+          
+          // If we got here, we're authenticated
+          print('Successfully authenticated with Firebase using access token only');
+        }
+      } catch (authError) {
+        print('Error getting Google authentication: $authError');
         throw ApiException(
-          message: 'Failed to get Google authentication tokens',
+          message: 'Failed to get Google authentication tokens: ${authError.toString()}',
           statusCode: 401,
         );
       }
-
-      print('Google auth tokens received successfully');
-
-      // Step 3: Firebase auth
-      final credential = GoogleAuthProvider.credential(
-        accessToken: googleAuth.accessToken,
-        idToken: googleAuth.idToken,
-      );
-
-      // Step 4: Sign in to Firebase
-      print('Signing in to Firebase with Google credential...');
-      final userCredential = await _auth.signInWithCredential(credential);
-      if (userCredential.user == null) {
-        print('Failed to authenticate with Firebase');
+      
+      // Step 3: Firebase auth if not already done
+      if (googleAuth.idToken != null) {
+        print('Using ID token for Firebase authentication');
+        // Create credential with both tokens if available
+        final credential = GoogleAuthProvider.credential(
+          accessToken: googleAuth.accessToken,
+          idToken: googleAuth.idToken,
+        );
+        
+        // Sign in to Firebase
+        try {
+          final userCredential = await _auth.signInWithCredential(credential);
+          print('Firebase authentication successful with ID token');
+          
+          if (userCredential.user == null) {
+            print('Failed to get user from Firebase');
+            throw ApiException(
+              message: 'Failed to get user from Firebase',
+              statusCode: 401,
+            );
+          }
+        } catch (firebaseError) {
+          print('Firebase sign-in error: $firebaseError');
+          throw ApiException(
+            message: 'Failed to authenticate with Firebase: ${firebaseError.toString()}',
+            statusCode: 401,
+          );
+        }
+      }
+      
+      // Verify Firebase authentication worked
+      final currentUser = _auth.currentUser;
+      if (currentUser == null) {
+        print('Current user is null after authentication');
         throw ApiException(
           message: 'Failed to authenticate with Firebase',
           statusCode: 401,
         );
       }
       
-      print('Firebase authentication successful: ${userCredential.user?.email}');
+      print('Firebase authentication successful: ${currentUser.email}');
+      
       return googleUser;
     } catch (e) {
       print('Google Sign In Error: $e');
@@ -411,6 +476,18 @@ class AuthService extends ChangeNotifier {
         );
       } else if (e is ApiException) {
         rethrow;
+      } else if (e.toString().contains('PlatformException')) {
+        // Handle platform exception specifically for error code 10
+        if (e.toString().contains('ApiException: 10:')) {
+          throw ApiException(
+            message: 'Google Sign In failed due to configuration issue. Please check your internet connection and try again.',
+            statusCode: 400,
+          );
+        }
+        throw ApiException(
+          message: 'Google sign-in failed: Platform error',
+          statusCode: 401,
+        );
       }
       throw ApiException(
         message: 'Google sign-in failed: ${e.toString()}',
@@ -419,92 +496,147 @@ class AuthService extends ChangeNotifier {
     }
   }
 
-  // Complete Google Sign In process (backend sync)
+  // Complete Google Sign In process by syncing with backend
   Future<Map<String, dynamic>> completeGoogleSignIn(GoogleSignInAccount googleUser) async {
     try {
-      print('Completing Google sign-in process...');
+      print('Completing Google sign in with backend sync');
       
-      final email = googleUser.email;
-      final displayName = googleUser.displayName ?? '';
-      final names = displayName.split(' ');
-      final firstName = names.isNotEmpty ? names.first : '';
-      final lastName = names.length > 1 ? names.sublist(1).join(' ') : '';
-      
-      print('Google sign-in user data:');
-      print('Email: $email');
-      print('First name: $firstName');
-      print('Last name: $lastName');
-      
-      // Get the Firebase token
-      print('Getting Firebase ID token...');
-      final token = await _auth.currentUser?.getIdToken(true); // Force refresh token
-      if (token == null) {
-        print('No authentication token available');
+      // Get the current Firebase user
+      final firebaseUser = _auth.currentUser;
+      if (firebaseUser == null) {
+        print('No Firebase user found');
         throw ApiException(
-          message: 'No authentication token available',
+          message: 'Firebase authentication failed',
           statusCode: 401,
         );
       }
       
-      print('Firebase token obtained successfully');
+      // Get fresh ID token with retry logic
+      print('Getting Firebase ID token');
+      String? token;
+      int retryCount = 0;
+      const maxRetries = 3;
       
-      // Sync with backend
-      print('Syncing with backend...');
-      final customerData = await _apiService.socialAuth(
-        provider: 'GOOGLE',
-        email: email,
-        firstName: firstName,
-        lastName: lastName,
-        imageUrl: googleUser.photoUrl,
-        token: token,
-      );
+      while (retryCount < maxRetries) {
+        try {
+          print('Attempt ${retryCount + 1} to get Firebase ID token');
+          token = await firebaseUser.getIdToken(true); // Force refresh token
+          if (token != null && token.isNotEmpty) {
+            print('Successfully retrieved Firebase ID token on attempt ${retryCount + 1}');
+            print('Token length: ${token.length}');
+            break;
+          }
+        } catch (tokenError) {
+          print('Error getting ID token on attempt ${retryCount + 1}: $tokenError');
+          if (retryCount == maxRetries - 1) {
+            throw ApiException(
+              message: 'Failed to get Firebase ID token after multiple retries',
+              statusCode: 401,
+            );
+          }
+        }
+        
+        // Increase delay with each retry
+        await Future.delayed(Duration(seconds: retryCount + 1));
+        retryCount++;
+      }
       
-      print('Backend sync successful: ${customerData['customer']?.toString() ?? "No customer data"}');
+      if (token == null || token.isEmpty) {
+        throw ApiException(
+          message: 'Failed to get authentication token',
+          statusCode: 401,
+        );
+      }
       
-      // Cache the token for future requests
-      await _apiService.cacheFirebaseToken(token);
+      // Extract user details from Google account
+      final email = googleUser.email;
+      final displayName = googleUser.displayName ?? '';
+      final nameParts = displayName.split(' ');
+      final firstName = nameParts.isNotEmpty ? nameParts[0] : '';
+      final lastName = nameParts.length > 1 ? nameParts.sublist(1).join(' ') : '';
+      final photoUrl = googleUser.photoUrl;
+      
+      print('Sending social auth request to backend with token length: ${token.length}');
+      print('Social auth request details:');
+      print('Provider: GOOGLE');
+      print('Email: $email');
+      print('Name: $firstName $lastName');
+      
+      // Send social auth request to backend with retry logic
+      Map<String, dynamic> customerData = {};
+      retryCount = 0;
+      
+      while (retryCount < maxRetries) {
+        try {
+          print('Attempt ${retryCount + 1} to send social auth request');
+          customerData = await _apiService.socialAuth(
+            provider: 'GOOGLE',
+            email: email,
+            firstName: firstName,
+            lastName: lastName,
+            imageUrl: photoUrl,
+            token: token,
+          );
+          print('Social auth request successful on attempt ${retryCount + 1}');
+          break;
+        } catch (apiError) {
+          print('API error on attempt ${retryCount + 1}: $apiError');
+          if (retryCount == maxRetries - 1) {
+            if (apiError is ApiException) {
+              rethrow;
+            }
+            throw ApiException(
+              message: 'Failed to authenticate with backend: ${apiError.toString()}',
+              statusCode: 500,
+            );
+          }
+        }
+        
+        // Increase delay with each retry
+        await Future.delayed(Duration(seconds: retryCount + 1));
+        retryCount++;
+      }
+      
+      print('Social auth completed successfully');
       
       // Explicitly cache the customer email in SharedPreferences
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('customer_email', email);
-      print('Cached customer email: $email');
       
-      // Notify listeners of auth state change
-      notifyListeners();
-      
-      // Register device token for push notifications
-      print('Starting FCM token registration after Google sign-in...');
-      await _notificationService.registerDeviceTokenAsync(email: email);
-      
+      print('Customer data cached successfully');
       return customerData;
     } catch (e) {
-      print('Error syncing with backend after Google Sign In: $e');
-      print('Stack trace: ${StackTrace.current}');
+      print('Error completing Google sign in: $e');
       if (e is ApiException) {
         rethrow;
       }
       throw ApiException(
-        message: 'Failed to sync with backend: ${e.toString()}',
+        message: 'Failed to complete Google sign in: ${e.toString()}',
         statusCode: 500,
       );
     }
   }
 
-  // Sign in with Apple
-  Future<UserCredential?> signInWithApple() async {
+  // Sign in with Apple (iOS only) - Following Firebase documentation
+  Future<Map<String, dynamic>?> signInWithApple() async {
     try {
-      if (!await SignInWithApple.isAvailable()) {
-        throw FirebaseAuthException(
-          code: 'apple_sign_in_not_available',
+      // Check if Apple Sign In is available on this device
+      final isAvailable = await SignInWithApple.isAvailable();
+      if (!isAvailable) {
+        print('Apple Sign In is not available on this device');
+        throw ApiException(
           message: 'Apple Sign In is not available on this device',
+          statusCode: 400,
         );
       }
 
-      // Generate nonce
+      // Generate secure nonce
       final rawNonce = _generateNonce();
       final nonce = _sha256ofString(rawNonce);
 
-      // Request credential for the sign-in
+      print('Requesting Apple ID credential');
+      
+      // Request credential with minimal scopes
       final appleCredential = await SignInWithApple.getAppleIDCredential(
         scopes: [
           AppleIDAuthorizationScopes.email,
@@ -512,51 +644,67 @@ class AuthService extends ChangeNotifier {
         ],
         nonce: nonce,
       );
-
-      // Create OAuthCredential
-      final oauthCredential = OAuthProvider("apple.com").credential(
-        idToken: appleCredential.identityToken,
-        rawNonce: rawNonce,
-      );
-
-      // Sign in to Firebase
-      final userCredential = await _auth.signInWithCredential(oauthCredential);
-
-      // Update user display name if it's empty (first time sign in)
-      if (userCredential.user != null &&
-          (userCredential.user!.displayName == null || userCredential.user!.displayName!.isEmpty) &&
-          appleCredential.givenName != null) {
-        await userCredential.user!.updateDisplayName(
-          "${appleCredential.givenName} ${appleCredential.familyName ?? ''}".trim()
+      
+      print('Successfully got Apple ID credential');
+      
+      // Check if we have the identity token
+      if (appleCredential.identityToken == null) {
+        print('Error: No identity token received from Apple');
+        throw ApiException(
+          message: 'No identity token received from Apple',
+          statusCode: 401,
         );
       }
+      
+      // Create an OAuthCredential from the credential returned by Apple
+      final oauthCredential = OAuthProvider('apple.com').credential(
+        idToken: appleCredential.identityToken!,
+        rawNonce: rawNonce,
+        accessToken: appleCredential.authorizationCode, // Add this line to fix the invalid OAuth response error
+      );
 
-      // Store user data in API
-      if (userCredential.user != null) {
-        try {
-          await _apiService.storeUserData(
-            userCredential.user!.uid,
-            userCredential.user!.email ?? '',
-            userCredential.user!.displayName ?? '',
-            'apple',
-          );
-        } catch (e) {
-          print('Error storing user data: $e');
-          // Continue even if storing user data fails
-          // This prevents the PigeonUserDetails error from stopping the sign-in process
+      print('Signing in to Firebase with Apple credential');
+      
+      // Sign in to Firebase with the Apple OAuthCredential
+      final userCredential = await _auth.signInWithCredential(oauthCredential);
+      final user = userCredential.user;
+      
+      if (user == null) {
+        throw ApiException(
+          message: 'Firebase authentication failed',
+          statusCode: 401,
+        );
+      }
+      
+      // Get user information
+      final email = user.email ?? '';
+      final firstName = appleCredential.givenName ?? '';
+      final lastName = appleCredential.familyName ?? '';
+      
+      // Update display name if needed and if we have name information
+      if (firstName.isNotEmpty || lastName.isNotEmpty) {
+        final displayName = '$firstName $lastName'.trim();
+        if (displayName.isNotEmpty && (user.displayName == null || user.displayName!.isEmpty)) {
+          await user.updateDisplayName(displayName);
         }
       }
-
-      return userCredential;
+      
+      // Return user information
+      return {
+        'uid': user.uid,
+        'email': email,
+        'firstName': firstName,
+        'lastName': lastName,
+      };
     } catch (e) {
       print('Error signing in with Apple: $e');
-      // Handle the PigeonUserDetails type cast error
-      if (e.toString().contains('PigeonUserDetails')) {
-        print('Caught PigeonUserDetails type cast error - this is likely due to a compatibility issue with the sign_in_with_apple plugin');
-        // Return null to indicate sign-in failed, but don't throw an exception
-        return null;
+      if (e is ApiException) {
+        rethrow;
       }
-      rethrow;
+      throw ApiException(
+        message: 'Failed to sign in with Apple: ${e.toString()}',
+        statusCode: 500,
+      );
     }
   }
 

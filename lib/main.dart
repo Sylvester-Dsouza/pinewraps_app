@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:provider/provider.dart';
 import 'package:line_icons/line_icons.dart';
+import 'dart:io';
 import 'firebase_options.dart';
 import 'config/environment.dart';
 import 'screens/auth/login_screen.dart';
@@ -20,6 +21,10 @@ import 'screens/notifications/notification_screen.dart';
 import 'services/auth_service.dart';
 import 'services/cart_service.dart';
 import 'services/notification_service.dart';
+import 'services/tracking_service.dart';
+import 'services/firebase_analytics.dart';
+import 'package:firebase_analytics/firebase_analytics.dart';
+import 'services/facebook_analytics.dart';
 import 'screens/splash/splash_screen.dart';
 
 void main() async {
@@ -36,6 +41,14 @@ void main() async {
   if (kReleaseMode) {
     EnvironmentConfig.setEnvironment(Environment.production);
   }
+  
+  // Request tracking authorization for iOS
+  if (Platform.isIOS) {
+    await TrackingService().requestTrackingAuthorization();
+  }
+
+  // Initialize Facebook Analytics
+  await FacebookAnalytics.init();
 
   try {
     // Initialize Firebase with the new API for Firebase 3.x
@@ -113,6 +126,8 @@ void setupEnvironment() {
 }
 
 class MyApp extends StatelessWidget {
+  static FirebaseAnalytics analytics = FirebaseAnalytics.instance;
+  static FirebaseAnalyticsObserver observer = FirebaseAnalyticsObserver(analytics: analytics);
   const MyApp({super.key});
 
   @override
@@ -122,7 +137,9 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => AuthService()),
         ChangeNotifierProvider(create: (_) => CartService()),
       ],
-      child: MaterialApp(
+      child: Directionality(
+        textDirection: TextDirection.ltr, // Force left-to-right text direction globally
+        child: MaterialApp(
         title: 'Pinewraps',
         debugShowCheckedModeBanner: false,
         theme: ThemeData(
@@ -132,6 +149,14 @@ class MyApp extends StatelessWidget {
           ),
           useMaterial3: true,
           scaffoldBackgroundColor: Colors.white,
+          cardTheme: CardTheme(
+            color: Colors.grey[50], // Very light shade of gray for all cards
+            elevation: 0,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: BorderSide(color: Colors.grey[300]!),
+            ),
+          ),
           appBarTheme: const AppBarTheme(
             backgroundColor: Colors.white,
             elevation: 0,
@@ -187,7 +212,7 @@ class MyApp extends StatelessWidget {
           '/login': (context) => const LoginScreen(),
           '/notifications': (context) => const NotificationScreen(),
         },
-      ),
+      )),
     );
   }
 }
@@ -285,18 +310,18 @@ class MainScreenState extends State<MainScreen> {
       bottomNavigationBar: BottomNavigationBar(
         items: [
           const BottomNavigationBarItem(
-            icon: Icon(LineIcons.home),
+            icon: Icon(LineIcons.home, size: 22),
             label: 'Home',
           ),
           const BottomNavigationBarItem(
-            icon: Icon(LineIcons.shoppingBag),
+            icon: Icon(LineIcons.store, size: 22),
             label: 'Shop',
           ),
           BottomNavigationBarItem(
             icon: Stack(
               clipBehavior: Clip.none,
               children: [
-                const Icon(LineIcons.shoppingCart),
+                const Icon(LineIcons.shoppingCart, size: 22),
                 if (cartItemCount > 0)
                   Positioned(
                     right: -8,
@@ -327,7 +352,7 @@ class MainScreenState extends State<MainScreen> {
             label: 'Cart',
           ),
           const BottomNavigationBarItem(
-            icon: Icon(LineIcons.user),
+            icon: Icon(LineIcons.userCircle, size: 22),
             label: 'Profile',
           ),
         ],

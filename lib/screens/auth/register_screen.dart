@@ -216,7 +216,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     TextFormField(
                       controller: _phoneController,
                       decoration:
-                          AuthStyles.inputDecoration('Phone *').copyWith(
+                          AuthStyles.inputDecoration('Phone (Optional)').copyWith(
                         prefixIcon: const Icon(Icons.phone_outlined),
                         prefixText: '+971 ',
                         prefixStyle: const TextStyle(
@@ -227,10 +227,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       keyboardType: TextInputType.phone,
                       textInputAction: TextInputAction.next,
                       validator: (value) {
+                        // Phone is optional, so empty value is allowed
                         if (value == null || value.isEmpty) {
-                          return 'Please enter your phone number';
+                          return null;
                         }
-                        // Validate UAE phone number format
+                        // If provided, validate UAE phone number format
                         final phoneNum = value.trim();
                         if (!RegExp(r'^[0-9]{9}$').hasMatch(phoneNum)) {
                           return 'Please enter a valid 9-digit phone number';

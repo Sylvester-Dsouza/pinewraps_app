@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../models/cart_item.dart';
 import '../../services/cart_service.dart';
@@ -251,9 +252,23 @@ class CartItemWidget extends StatelessWidget {
                   ),
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(8),
-                    child: Image.network(
-                      item.product.images.first.url,
+                    child: CachedNetworkImage(
+                      imageUrl: item.product.images.first.url,
                       fit: BoxFit.cover,
+                      fadeInDuration: const Duration(milliseconds: 200),
+                      memCacheWidth: 400, // Optimize memory cache size
+                      placeholder: (context, url) => Container(
+                        color: Colors.grey[100],
+                        child: const Center(
+                          child: CircularProgressIndicator(),
+                        ),
+                      ),
+                      errorWidget: (context, url, error) => Container(
+                        color: Colors.grey[200],
+                        child: const Center(
+                          child: Icon(Icons.error_outline, color: Colors.grey),
+                        ),
+                      ),
                     ),
                   ),
                 ),
@@ -333,6 +348,61 @@ class CartItemWidget extends StatelessWidget {
                             color: Colors.grey[600],
                           ),
                         ),
+                      ],
+                      
+                      // Display selected addons if available
+                      if (item.selectedOptions.containsKey('addons')) ...[
+                        const SizedBox(height: 8),
+                        const Text(
+                          'Selected Addons:',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        ...(item.selectedOptions['addons'] as List<dynamic>).map((addon) {
+                          // Just show the addon name and option name without price
+                          String addonText = '${addon['addonName']}: ${addon['optionName']}';
+                          
+                          // No longer showing individual addon prices
+                          
+                          // Create a widget list for the addon and its custom text if available
+                          List<Widget> addonWidgets = [
+                            Text(
+                              addonText,
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: Colors.grey[600],
+                              ),
+                            ),
+                          ];
+                          
+                          // Add custom text if available
+                          if (addon.containsKey('customText') && addon['customText'].toString().isNotEmpty) {
+                            addonWidgets.add(
+                              Padding(
+                                padding: const EdgeInsets.only(left: 8, top: 2),
+                                child: Text(
+                                  'Custom writing: ${addon['customText']}',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontStyle: FontStyle.italic,
+                                    color: Colors.grey[500],
+                                  ),
+                                ),
+                              ),
+                            );
+                          }
+                          
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 4),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: addonWidgets,
+                            ),
+                          );
+                        }).toList(),
                       ],
                     ],
                   ),

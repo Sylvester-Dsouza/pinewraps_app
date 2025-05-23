@@ -5,9 +5,9 @@ import '../config/environment.dart';
 
 class PaymentService {
   final ApiService _apiService;
-  final bool _useSandbox = true; // Set to true for sandbox testing
+  final bool _useSandbox = false; // Set to false for production environment
 
-  PaymentService({ApiService? apiService}) 
+  PaymentService({ApiService? apiService})
       : _apiService = apiService ?? ApiService();
 
   Future<Map<String, String>> createPaymentOrder({
@@ -15,7 +15,7 @@ class PaymentService {
   }) async {
     try {
       print('Creating payment order for orderId: $orderId');
-      
+
       final response = await _apiService.sendRequest(
         '/payments/create',
         method: 'POST',
@@ -30,9 +30,10 @@ class PaymentService {
 
       if (response.statusCode == 200 && response.data != null) {
         // Check if data is nested in a 'data' field
-        final responseData = response.data is Map ? 
-            (response.data['data'] ?? response.data) : response.data;
-            
+        final responseData = response.data is Map
+            ? (response.data['data'] ?? response.data)
+            : response.data;
+
         print('Processing response data: $responseData');
 
         final paymentUrl = responseData['paymentUrl']?.toString();
@@ -49,14 +50,16 @@ class PaymentService {
 
         return {
           'paymentUrl': paymentUrl,
-          'reference': merchantOrderId ?? '',  // Using merchantOrderId as reference
+          'reference':
+              merchantOrderId ?? '', // Using merchantOrderId as reference
           'orderId': orderId ?? '',
           'orderNumber': orderNumber ?? ''
         };
       }
 
       print('Invalid response status code: ${response.statusCode}');
-      throw Exception('Failed to create payment order: Invalid response from server');
+      throw Exception(
+          'Failed to create payment order: Invalid response from server');
     } catch (e) {
       print('Error creating payment order: $e');
       rethrow;
@@ -66,18 +69,18 @@ class PaymentService {
   Future<bool> verifyPayment(String reference) async {
     try {
       print('Verifying payment for reference: $reference');
-      
+
       // Maximum number of retries
       const maxRetries = 5;
       // Wait time between retries in seconds
       const retryDelay = 2;
       bool callbackTriggered = false;
-      
+
       for (int i = 0; i < maxRetries; i++) {
         // Check the payment status directly without triggering the callback
         // This prevents duplicate reward points processing
         final response = await _apiService.sendRequest(
-          '/payments/mobile/status/$reference',  
+          '/payments/mobile/status/$reference',
           method: 'GET',
         );
 
@@ -85,13 +88,14 @@ class PaymentService {
 
         if (response.statusCode == 200 && response.data != null) {
           final responseData = response.data['data'];
-          final paymentStatus = responseData['status']?.toString().toUpperCase();
+          final paymentStatus =
+              responseData['status']?.toString().toUpperCase();
           print('Payment status: $paymentStatus');
-          
+
           // Check if payment is captured
           if (paymentStatus == 'CAPTURED') {
             print('Payment captured successfully');
-            
+
             // Only trigger the callback once per verification session
             // and only if it hasn't been triggered yet
             if (!callbackTriggered) {
@@ -103,9 +107,7 @@ class PaymentService {
                 final baseUrl = EnvironmentConfig.apiBaseUrl;
                 await dio.get(
                   '$baseUrl/payments/mobile-callback',
-                  queryParameters: {
-                    'ref': reference
-                  },
+                  queryParameters: {'ref': reference},
                 );
                 print('Successfully triggered payment callback after capture');
               } catch (e) {
@@ -113,26 +115,28 @@ class PaymentService {
                 // Continue even if callback fails, as the payment was successful
               }
             } else {
-              print('Callback already triggered, skipping to avoid duplicate reward points');
+              print(
+                  'Callback already triggered, skipping to avoid duplicate reward points');
             }
-            
+
             return true;
           }
-          
+
           // If payment failed or was cancelled, stop retrying
           if (paymentStatus == 'FAILED' || paymentStatus == 'CANCELLED') {
             print('Payment failed or cancelled. Status: $paymentStatus');
             return false;
           }
-          
+
           // If still pending and not last attempt, wait and retry
           if (i < maxRetries - 1) {
-            print('Payment still pending, waiting ${retryDelay}s before retry ${i + 2}/$maxRetries');
+            print(
+                'Payment still pending, waiting ${retryDelay}s before retry ${i + 2}/$maxRetries');
             await Future.delayed(const Duration(seconds: retryDelay));
           }
         }
       }
-      
+
       print('Payment verification failed after $maxRetries attempts');
       return false;
     } catch (e) {
@@ -152,7 +156,7 @@ class PaymentService {
           print('Payment completed successfully');
           return true;
         }
-        
+
         print('Payment not complete yet, attempt ${attempts + 1}/$maxAttempts');
         // Wait 5 seconds before next attempt
         await Future.delayed(const Duration(seconds: 5));

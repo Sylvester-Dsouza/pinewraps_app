@@ -2,6 +2,7 @@ plugins {
     id "com.android.application"
     id "kotlin-android"
     id "dev.flutter.flutter-gradle-plugin"
+    id "com.google.gms.google-services"
 }
 
 def localProperties = new Properties()
@@ -31,6 +32,7 @@ android {
 
     kotlinOptions {
         jvmTarget = '17'
+        freeCompilerArgs += ["-Xjvm-default=all"]
     }
 
     sourceSets {
@@ -72,7 +74,8 @@ android {
         }
         release {
             signingConfig signingConfigs.release
-            minifyEnabled true
+            minifyEnabled false
+            shrinkResources false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
     }
@@ -80,6 +83,51 @@ android {
 
 flutter {
     source "../.."
+}
+
+// Ensure APK and AAB are properly generated and copied to Flutter output directory
+tasks.whenTaskAdded { task ->
+    if (task.name == 'assembleRelease' || task.name == 'assembleDebug') {
+        task.doLast {
+            // Create the Flutter output directory if it doesn't exist
+            def flutterOutputDir = new File("${rootProject.projectDir}/../build/app/outputs/flutter-apk/")
+            if (!flutterOutputDir.exists()) {
+                flutterOutputDir.mkdirs()
+            }
+            
+            // Copy the APK to the Flutter output directory
+            def buildType = task.name.contains('Release') ? 'release' : 'debug'
+            def sourceApk = new File("${buildDir}/outputs/apk/${buildType}/app-${buildType}.apk")
+            if (sourceApk.exists()) {
+                def targetApk = new File("${rootProject.projectDir}/../build/app/outputs/flutter-apk/app-${buildType}.apk")
+                targetApk.bytes = sourceApk.bytes
+                println "Copied ${sourceApk.path} to ${targetApk.path}"
+            } else {
+                println "Warning: ${sourceApk.path} does not exist"
+            }
+        }
+    }
+    
+    // Handle AAB generation for Play Console
+    if (task.name == 'bundleRelease') {
+        task.doLast {
+            // Create the Flutter output directory for AAB if it doesn't exist
+            def flutterOutputDir = new File("${rootProject.projectDir}/../build/app/outputs/bundle/release/")
+            if (!flutterOutputDir.exists()) {
+                flutterOutputDir.mkdirs()
+            }
+            
+            // Copy the AAB to the Flutter output directory
+            def sourceAab = new File("${buildDir}/outputs/bundle/release/app-release.aab")
+            if (sourceAab.exists()) {
+                def targetAab = new File("${rootProject.projectDir}/../build/app/outputs/bundle/release/app-release.aab")
+                targetAab.bytes = sourceAab.bytes
+                println "Copied ${sourceAab.path} to ${targetAab.path}"
+            } else {
+                println "Warning: ${sourceAab.path} does not exist"
+            }
+        }
+    }
 }
 
 dependencies {
@@ -96,7 +144,9 @@ tasks.register('copyApkToFlutterDir') {
     doLast {
         def possibleSourceApks = [
             "${buildDir}/outputs/flutter-apk/app-debug.apk",
-            "${buildDir}/outputs/apk/debug/app-debug.apk"
+            "${buildDir}/outputs/apk/debug/app-debug.apk",
+            "${buildDir}/outputs/apk/release/app-release.apk",
+            "${buildDir}/outputs/flutter-apk/app-release.apk"
         ]
         def targetDir = "${rootProject.projectDir}/../build/app/outputs/flutter-apk/"
         

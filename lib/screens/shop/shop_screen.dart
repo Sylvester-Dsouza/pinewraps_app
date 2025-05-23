@@ -279,6 +279,7 @@ class _ShopScreenState extends State<ShopScreen> {
                         },
                         backgroundColor: Colors.grey[200],
                         selectedColor: Colors.black,
+                        checkmarkColor: Colors.white, // Make the tick icon white
                         labelStyle: TextStyle(
                           color: _selectedCategory == null ? Colors.white : Colors.black,
                           fontWeight: _selectedCategory == null ? FontWeight.bold : FontWeight.normal,
@@ -297,6 +298,7 @@ class _ShopScreenState extends State<ShopScreen> {
                           },
                           backgroundColor: Colors.grey[200],
                           selectedColor: Colors.black,
+                          checkmarkColor: Colors.white, // Make the tick icon white
                           labelStyle: TextStyle(
                             color: isSelected ? Colors.white : Colors.black,
                             fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
@@ -416,7 +418,10 @@ class _ShopScreenState extends State<ShopScreen> {
                 ),
                 gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                   crossAxisCount: MediaQuery.of(context).size.width > 600 ? 3 : 2,
-                  mainAxisExtent: 240, // Fixed height for items
+                  // Calculate mainAxisExtent to ensure 1:1 image ratio plus space for text
+                  mainAxisExtent: MediaQuery.of(context).size.width > 600 
+                    ? (MediaQuery.of(context).size.width / 3) + 80 // For tablets: image + text
+                    : (MediaQuery.of(context).size.width / 2) + 80, // For phones: image + text
                   crossAxisSpacing: 16,
                   mainAxisSpacing: 16,
                 ),

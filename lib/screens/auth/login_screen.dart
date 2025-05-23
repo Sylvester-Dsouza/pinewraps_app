@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart' show defaultTargetPlatform, TargetPlatform;
+import 'package:flutter/foundation.dart'
+    show defaultTargetPlatform, TargetPlatform;
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../services/auth_service.dart';
 import '../../services/api_service.dart';
@@ -26,7 +27,7 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() {
       _errorMessage = message;
     });
-    
+
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
@@ -39,7 +40,7 @@ class _LoginScreenState extends State<LoginScreen> {
   void _showSuccess(String message) {
     // Used to display success messages to the user
     if (!mounted) return;
-    
+
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
@@ -62,8 +63,9 @@ class _LoginScreenState extends State<LoginScreen> {
     });
 
     try {
-      print('Attempting to sign in with email: ${_emailController.text.trim()}');
-      
+      print(
+          'Attempting to sign in with email: ${_emailController.text.trim()}');
+
       // Attempt to sign in
       final customerData = await _authService.signInWithEmailPassword(
         email: _emailController.text.trim(),
@@ -83,7 +85,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
       if (mounted) {
         _showSuccess('Login successful! Welcome back.');
-        
+
         // Navigate to main screen
         Navigator.of(context).pushAndRemoveUntil(
           MaterialPageRoute(
@@ -95,7 +97,7 @@ class _LoginScreenState extends State<LoginScreen> {
     } on FirebaseAuthException catch (e) {
       print('Firebase Auth Error: ${e.code} - ${e.message}');
       String errorMessage = 'Authentication failed';
-      
+
       // Handle specific Firebase errors
       switch (e.code) {
         case 'user-not-found':
@@ -113,7 +115,7 @@ class _LoginScreenState extends State<LoginScreen> {
         default:
           errorMessage = e.message ?? 'Authentication failed';
       }
-      
+
       _showError(errorMessage);
     } on ApiException catch (e) {
       print('API Error: ${e.message} (${e.statusCode})');
@@ -143,11 +145,22 @@ class _LoginScreenState extends State<LoginScreen> {
           duration: Duration(seconds: 2),
         ),
       );
-      
-      // Start Google Sign In process
+
+      // Start Google Sign In process with improved error handling
       print('Starting Google sign-in process');
-      final googleUser = await _authService.startGoogleSignIn();
-      
+      final googleUser =
+          await _authService.startGoogleSignIn().catchError((error) {
+        print('Caught error in UI layer: $error');
+        // Convert any errors to ApiException for consistent handling
+        if (error is! ApiException) {
+          throw ApiException(
+            message: 'Google sign-in failed: ${error.toString()}',
+            statusCode: 401,
+          );
+        }
+        throw error;
+      });
+
       if (googleUser != null && mounted) {
         // Show loading indicator for backend sync
         ScaffoldMessenger.of(context).showSnackBar(
@@ -156,12 +169,12 @@ class _LoginScreenState extends State<LoginScreen> {
             duration: Duration(seconds: 2),
           ),
         );
-        
+
         // Complete the backend sync and wait for it
         print('Completing backend sync for user: ${googleUser.email}');
         final result = await _authService.completeGoogleSignIn(googleUser);
         print('Backend sync completed successfully');
-        
+
         if (result.isEmpty) {
           throw ApiException(
             message: 'Failed to sync user data with backend',
@@ -171,7 +184,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
         if (mounted) {
           _showSuccess('Login successful! Welcome back.');
-          
+
           // Navigate to main screen and remove all previous routes
           Navigator.of(context).pushReplacement(
             MaterialPageRoute(builder: (context) => const MainScreen()),
@@ -187,15 +200,23 @@ class _LoginScreenState extends State<LoginScreen> {
     } catch (e) {
       print('Google Sign In Error: $e'); // Debug log
       String errorMessage = 'Failed to sign in with Google';
-      
+
       if (e is ApiException) {
         errorMessage = e.message;
         print('API Exception: ${e.message} (${e.statusCode})');
+
+        // Special handling for error code 10 (common Google Sign In issue)
+        if (e.message.contains('configuration issue') ||
+            e.toString().contains('ApiException: 10:')) {
+          errorMessage =
+              'Google Sign In is not properly configured. Please check your internet connection and try again.';
+        }
       } else if (e is FirebaseAuthException) {
         // Handle specific Firebase auth errors
         switch (e.code) {
           case 'account-exists-with-different-credential':
-            errorMessage = 'An account already exists with the same email address but different sign-in credentials';
+            errorMessage =
+                'An account already exists with the same email address but different sign-in credentials';
             break;
           case 'invalid-credential':
             errorMessage = 'Invalid credentials';
@@ -213,12 +234,21 @@ class _LoginScreenState extends State<LoginScreen> {
           default:
             errorMessage = e.message ?? 'An error occurred during sign in';
         }
+      } else if (e.toString().contains('PlatformException')) {
+        // Handle platform exceptions
+        if (e.toString().contains('sign_in_failed') ||
+            e.toString().contains('ApiException: 10:')) {
+          errorMessage =
+              'Google Sign In failed. Please check your internet connection and try again.';
+        } else {
+          errorMessage = 'Sign in error: ${e.toString().split(',')[0]}';
+        }
       } else {
         print('Unknown error: $e');
       }
-      
+
       _showError(errorMessage);
-      
+
       // Additional user feedback
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -242,20 +272,52 @@ class _LoginScreenState extends State<LoginScreen> {
     });
 
     try {
-      final result = await _authService.signInWithApple();
-      print('Apple sign in result: $result'); // Debug log
-      
+      // First check if we're on iOS
+      if (defaultTargetPlatform != TargetPlatform.iOS) {
+        throw ApiException(
+          message: 'Apple Sign In is only available on iOS devices',
+          statusCode: 400,
+        );
+      }
+
+      // Attempt to sign in with Apple
+      final userInfo = await _authService.signInWithApple();
+      print('Apple sign in successful: $userInfo');
+
       if (mounted) {
         _showSuccess('Login successful! Welcome back.');
-        
+
         // Navigate to main screen and remove all previous routes
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(builder: (context) => const MainScreen()),
         );
       }
     } catch (e) {
-      print('Apple Sign In Error: $e'); // Debug log
-      _showError('Failed to sign in with Apple');
+      print('Apple Sign In Error: $e');
+
+      String errorMessage = 'Failed to sign in with Apple';
+
+      if (e is ApiException) {
+        errorMessage = e.message;
+      } else if (e is FirebaseAuthException) {
+        // Handle specific Firebase auth errors
+        switch (e.code) {
+          case 'invalid-credential':
+            errorMessage = 'Invalid Apple credentials. Please try again.';
+            break;
+          case 'user-disabled':
+            errorMessage = 'Your account has been disabled';
+            break;
+          case 'operation-not-allowed':
+            errorMessage = 'Apple Sign In is not enabled for this app';
+            break;
+          default:
+            errorMessage =
+                e.message ?? 'An error occurred during Apple sign in';
+        }
+      }
+
+      _showError(errorMessage);
     } finally {
       if (mounted) {
         setState(() {
@@ -269,8 +331,9 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Login'),
-        backgroundColor: Colors.green,
+        backgroundColor: Colors.black,
+        title: const Text('Login', style: TextStyle(color: Colors.white)),
+        iconTheme: const IconThemeData(color: Colors.white),
       ),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -294,7 +357,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       style: TextStyle(color: Colors.red.shade800),
                     ),
                   ),
-                
+
                 const SizedBox(height: 32),
                 Text(
                   'Welcome To PINEWRAPS',
@@ -310,10 +373,9 @@ class _LoginScreenState extends State<LoginScreen> {
                 const SizedBox(height: 32),
                 TextFormField(
                   controller: _emailController,
-                  decoration: AuthStyles.inputDecoration('Email')
-                    .copyWith(
-                      prefixIcon: const Icon(Icons.email_outlined),
-                    ),
+                  decoration: AuthStyles.inputDecoration('Email').copyWith(
+                    prefixIcon: const Icon(Icons.email_outlined),
+                  ),
                   keyboardType: TextInputType.emailAddress,
                   textInputAction: TextInputAction.next,
                   validator: (value) {
@@ -329,20 +391,21 @@ class _LoginScreenState extends State<LoginScreen> {
                 const SizedBox(height: 16),
                 TextFormField(
                   controller: _passwordController,
-                  decoration: AuthStyles.inputDecoration('Password')
-                    .copyWith(
-                      prefixIcon: const Icon(Icons.lock_outline),
-                      suffixIcon: IconButton(
-                        icon: Icon(
-                          _obscurePassword ? Icons.visibility_off : Icons.visibility,
-                        ),
-                        onPressed: () {
-                          setState(() {
-                            _obscurePassword = !_obscurePassword;
-                          });
-                        },
+                  decoration: AuthStyles.inputDecoration('Password').copyWith(
+                    prefixIcon: const Icon(Icons.lock_outline),
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        _obscurePassword
+                            ? Icons.visibility_off
+                            : Icons.visibility,
                       ),
+                      onPressed: () {
+                        setState(() {
+                          _obscurePassword = !_obscurePassword;
+                        });
+                      },
                     ),
+                  ),
                   obscureText: _obscurePassword,
                   textInputAction: TextInputAction.done,
                   onFieldSubmitted: (_) => _signInWithEmailPassword(),
@@ -361,15 +424,16 @@ class _LoginScreenState extends State<LoginScreen> {
                   onPressed: _isLoading ? null : _signInWithEmailPassword,
                   style: AuthStyles.elevatedButtonStyle,
                   child: _isLoading
-                    ? const SizedBox(
-                        height: 20,
-                        width: 20,
-                        child: CircularProgressIndicator(
-                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                          strokeWidth: 2,
-                        ),
-                      )
-                    : Text('Login', style: AuthStyles.buttonTextStyle),
+                      ? const SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(
+                            valueColor:
+                                AlwaysStoppedAnimation<Color>(Colors.white),
+                            strokeWidth: 2,
+                          ),
+                        )
+                      : Text('Login', style: AuthStyles.buttonTextStyle),
                 ),
                 const SizedBox(height: 16),
                 const Row(
@@ -383,16 +447,50 @@ class _LoginScreenState extends State<LoginScreen> {
                   ],
                 ),
                 const SizedBox(height: 16),
-                OutlinedButton.icon(
-                  onPressed: _isLoading ? null : _signInWithGoogle,
-                  style: AuthStyles.outlinedButtonStyle,
-                  icon: Image.asset(
-                    'assets/images/google.png',
-                    height: 18,
+                // Only show Google sign-in on Android
+                if (defaultTargetPlatform == TargetPlatform.android) ...[
+                  OutlinedButton.icon(
+                    onPressed: _isLoading ? null : _signInWithGoogle,
+                    style: AuthStyles.outlinedButtonStyle,
+                    icon: Image.asset(
+                      'assets/images/google.png',
+                      height: 18,
+                    ),
+                    label: Text('Continue with Google',
+                        style: AuthStyles.buttonTextStyle),
                   ),
-                  label: Text('Continue with Google', style: AuthStyles.buttonTextStyle),
-                ),
-                const SizedBox(height: 16),
+                  const SizedBox(height: 16),
+
+                  // Continue without login button below Google sign-in
+                  TextButton(
+                    onPressed: () {
+                      Navigator.pushAndRemoveUntil(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const MainScreen(),
+                        ),
+                        (route) => false,
+                      );
+                    },
+                    style: TextButton.styleFrom(
+                      backgroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    child: const Text(
+                      'Continue without login',
+                      style: TextStyle(
+                        color: Colors.grey,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                ],
+
+                // Only show Apple sign-in on iOS
                 if (defaultTargetPlatform == TargetPlatform.iOS) ...[
                   OutlinedButton.icon(
                     onPressed: _isLoading ? null : _signInWithApple,
@@ -401,7 +499,36 @@ class _LoginScreenState extends State<LoginScreen> {
                       'assets/images/apple.png',
                       height: 20,
                     ),
-                    label: Text('Continue with Apple', style: AuthStyles.buttonTextStyle),
+                    label: Text('Continue with Apple',
+                        style: AuthStyles.buttonTextStyle),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Continue without login button below Apple sign-in
+                  TextButton(
+                    onPressed: () {
+                      Navigator.pushAndRemoveUntil(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const MainScreen(),
+                        ),
+                        (route) => false,
+                      );
+                    },
+                    style: TextButton.styleFrom(
+                      backgroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    child: const Text(
+                      'Continue without login',
+                      style: TextStyle(
+                        color: Colors.grey,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
                   ),
                   const SizedBox(height: 16),
                 ],
@@ -435,6 +562,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ),
                 ),
+                const SizedBox(height: 24),
               ],
             ),
           ),

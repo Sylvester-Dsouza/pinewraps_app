@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../../models/product.dart';
+import '../../models/product_addon.dart';
 import '../../services/product_service.dart';
 import '../../services/cart_service.dart';
 import '../../widgets/modern_notification.dart';
@@ -42,9 +44,11 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
   final TextEditingController _cakeTextController = TextEditingController();
   final PageController _pageController = PageController();
   int _currentImageIndex = 0;
-  // State for Sets category cake flavors
-  List<Map<String, dynamic>> _cakeFlavors = [];
-  bool _allCakeFlavorsSelected = false;
+  // State for product addons
+  List<ProductAddon> _productAddons = [];
+  List<SelectedAddonOption> _selectedAddons = [];
+  Map<String, String> _addonCustomTexts =
+      {}; // Maps addonId_optionId_selectionIndex to custom text
 
   @override
   void initState() {
@@ -74,7 +78,6 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
   @override
   void dispose() {
     _mounted = false;
-    _cakeTextController.dispose();
     _pageController.dispose();
     super.dispose();
   }
@@ -90,8 +93,6 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
   }
 
   Future<void> _loadProduct() async {
-    if (!mounted) return;
-
     try {
       setState(() {
         _isLoading = true;
@@ -117,6 +118,9 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
         print('Available sizes: ${product.sizes.join(", ")}');
       }
 
+      // Prefetch images to improve loading performance
+      _prefetchImages();
+
       // Setup initial selections from available options
       String? initialSize;
       String? initialFlavour;
@@ -138,9 +142,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
             product.getPriceForVariations(initialSize, initialFlavour);
       }
 
-      print(
-          'Initial setup - Size: $initialSize, Flavour: $initialFlavour, Price: $initialPrice');
-
+      // Set initial product state
       setState(() {
         _product = product;
         _selectedSize = initialSize;
@@ -149,46 +151,52 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
         _isLoading = false;
       });
 
-      // Initialize cake flavors for Sets category
-      if (_isSetCategory) {
-        // Get all variations from the product
-        List<ProductVariation> availableVariations = _product!.variations;
+      // Load product addons after setting initial product state
+      try {
+        final addons = await _productService.fetchProductAddons(product.id);
 
-        // If no variations are available, don't show the UI
-        if (availableVariations.isEmpty) {
-          return;
-        }
+        if (addons.isNotEmpty) {
+          print('Loaded ${addons.length} product addons');
 
-        // Try to get flavor variation first
-        ProductVariation? selectedVariation =
-            _product!.getVariationByType('FLAVOUR');
+          // Initialize selected addons with required addons' default options
+          List<SelectedAddonOption> initialSelectedAddons = [];
 
-        // If no flavor variation, use the first available variation
-        if (selectedVariation == null) {
-          selectedVariation = availableVariations.first;
-        }
+          for (var addon in addons) {
+            // Select the first option for all dropdowns by default if options exist
+            if (addon.options.isNotEmpty) {
+              // Determine how many dropdowns to show and initialize
+              int dropdownCount = addon.maxSelections;
 
-        List<ProductOption> variationOptions = selectedVariation.options;
-        String variationType = selectedVariation.type;
+              // If addon is required, ensure we show at least the minimum required dropdowns
+              if (addon.required && addon.minSelections > dropdownCount) {
+                dropdownCount = addon.minSelections;
+              }
 
-        // Initialize with default flavor for all 4 cakes
-        List<Map<String, dynamic>> initialFlavors = [];
-        for (int i = 1; i <= 4; i++) {
-          initialFlavors.add({
-            'cakeNumber': i,
-            'flavorId':
-                variationOptions.isNotEmpty ? variationOptions.first.value : '',
-            'variationType': variationType,
+              // Initialize each dropdown with the first option
+              for (int i = 0; i < dropdownCount; i++) {
+                // Use modulo to cycle through available options if there are fewer options than dropdowns
+                int optionIndex = i % addon.options.length;
+
+                initialSelectedAddons.add(SelectedAddonOption(
+                  addonId: addon.id,
+                  optionId: addon.options[optionIndex].id,
+                  selectionIndex: i,
+                ));
+              }
+            }
+          }
+
+          setState(() {
+            _productAddons = addons;
+            _selectedAddons = initialSelectedAddons;
           });
+
+          // Recalculate price with addons
+          _updateCartPrice();
         }
-
-        setState(() {
-          _cakeFlavors = initialFlavors;
-          _allCakeFlavorsSelected = true;
-        });
-
-        // Recalculate price with flavors
-        _updateCartPrice();
+      } catch (e) {
+        print('Error loading product addons: $e');
+        // Continue without addons if there's an error
       }
 
       // Prefetch images after product is loaded
@@ -210,48 +218,50 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
   double _calculatePrice() {
     if (_product == null) return 0;
 
-    print('\nCalculating price:');
-    print('Selected Size: $_selectedSize');
-    print('Selected Flavour: $_selectedFlavour');
-    print('Number of variations: ${_product!.variations.length}');
+    // Calculate base price from product variations (size, flavor, etc.)
+    double totalPrice =
+        _product!.getPriceForVariations(_selectedSize, _selectedFlavour);
+    print('Base price for product: $totalPrice');
 
-    // For Sets category, calculate price based on selected cake flavors
-    if (_isSetCategory) {
-      double totalPrice = _product!.basePrice;
-      print('Base price for set: $totalPrice');
+    // Add price adjustments for selected addons
+    if (_selectedAddons.isNotEmpty) {
+      double addonPrice = 0;
 
-      // Add price adjustments for each cake flavor
-      for (var flavor in _cakeFlavors) {
-        String flavorId = flavor['flavorId'];
-        String variationType = flavor['variationType'] ?? 'FLAVOUR';
+      for (var selectedAddon in _selectedAddons) {
+        // Find the addon group
+        final addonGroup = _productAddons.firstWhere(
+          (addon) => addon.id == selectedAddon.addonId,
+          orElse: () => ProductAddon(
+            id: '',
+            name: '',
+            description: '',
+            required: false,
+            minSelections: 0,
+            maxSelections: 0,
+            options: [],
+          ),
+        );
 
-        if (flavorId.isNotEmpty) {
-          // Find the variation by type
-          final variation = _product!.getVariationByType(variationType);
-          if (variation != null) {
-            // Find the option for this flavor
-            try {
-              final option = variation.options.firstWhere(
-                (o) => o.value == flavorId,
-              );
-              if (option.priceAdjustment > 0) {
-                print(
-                    'Adding price for Cake ${flavor['cakeNumber']} ${variation.type}: ${option.priceAdjustment}');
-                totalPrice += option.priceAdjustment;
-              }
-            } catch (e) {
-              print('Option not found for $flavorId: $e');
-            }
+        if (addonGroup.id.isNotEmpty) {
+          // Find the selected option
+          final option = addonGroup.options.firstWhere(
+            (opt) => opt.id == selectedAddon.optionId,
+            orElse: () => AddonOption(id: '', name: '', price: 0),
+          );
+
+          if (option.id.isNotEmpty && option.price > 0) {
+            print(
+                'Adding price for ${addonGroup.name}: ${option.name} - ${option.price}');
+            addonPrice += option.price;
           }
         }
       }
 
-      print('Total price for set: $totalPrice');
-      return totalPrice;
+      totalPrice += addonPrice;
+      print('Total price with addons: $totalPrice');
     }
 
-    // For regular products, calculate price based on selected size and flavor
-    return _product!.getPriceForVariations(_selectedSize, _selectedFlavour);
+    return totalPrice;
   }
 
   void _updateCartPrice() {
@@ -264,59 +274,229 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
     print('Updated price: $_currentPrice');
   }
 
-  void _onCakeFlavorSelected(
-      {required int cakeNumber, required String flavorId}) {
-    // Get the current variation type
-    String variationType = 'FLAVOUR';
-    if (_product != null && _product!.variations.isNotEmpty) {
-      ProductVariation? flavorVariation =
-          _product!.getVariationByType('FLAVOUR');
-      if (flavorVariation == null && _product!.variations.isNotEmpty) {
-        flavorVariation = _product!.variations.first;
-      }
-      if (flavorVariation != null) {
-        variationType = flavorVariation.type;
-      }
-    }
+  // Cake flavor functionality removed
 
-    final updatedFlavors = [..._cakeFlavors];
-    final existingIndex =
-        updatedFlavors.indexWhere((f) => f['cakeNumber'] == cakeNumber);
+  // Handle addon option selection for toggle-style selection
+  void _handleAddonOptionSelect(String addonId, String optionId) {
+    // Find the addon group to get its configuration
+    final addonGroup = _productAddons.firstWhere(
+      (addon) => addon.id == addonId,
+      orElse: () => ProductAddon(
+        id: '',
+        name: '',
+        description: '',
+        required: false,
+        minSelections: 0,
+        maxSelections: 0,
+        options: [],
+      ),
+    );
 
-    if (existingIndex >= 0) {
-      // Update existing flavor
-      updatedFlavors[existingIndex]['flavorId'] = flavorId;
-      updatedFlavors[existingIndex]['variationType'] = variationType;
-    } else {
-      // Add new flavor
-      updatedFlavors.add({
-        'cakeNumber': cakeNumber,
-        'flavorId': flavorId,
-        'variationType': variationType,
-      });
-    }
-
-    // Check if all flavors are selected
-    bool allSelected = true;
-    for (var flavor in updatedFlavors) {
-      if (flavor['flavorId'] == null || flavor['flavorId'].isEmpty) {
-        allSelected = false;
-        break;
-      }
-    }
+    if (addonGroup.id.isEmpty) return;
 
     setState(() {
-      _cakeFlavors = updatedFlavors;
-      _allCakeFlavorsSelected = allSelected;
-      _updateCartPrice();
+      // Find existing selections for this addon group
+      final existingSelections =
+          _selectedAddons.where((item) => item.addonId == addonId).toList();
+
+      // If this option is already selected, remove it (toggle behavior)
+      final existingSelection = existingSelections.firstWhere(
+        (item) => item.optionId == optionId,
+        orElse: () => SelectedAddonOption(addonId: '', optionId: ''),
+      );
+
+      if (existingSelection.addonId.isNotEmpty) {
+        // Don't allow deselection if it would violate minimum selections for required addons
+        if (addonGroup.required &&
+            existingSelections.length <= addonGroup.minSelections) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(
+                'You must select at least ${addonGroup.minSelections} option(s) for ${addonGroup.name}'),
+            duration: const Duration(seconds: 2),
+          ));
+          return;
+        }
+
+        // Remove the option
+        _selectedAddons.removeWhere(
+            (item) => item.addonId == addonId && item.optionId == optionId);
+      } else {
+        // Check if adding would exceed max selections
+        if (existingSelections.length >= addonGroup.maxSelections) {
+          // If we're at max selections, replace the oldest selection
+          if (existingSelections.isNotEmpty) {
+            final oldestSelection = existingSelections.first;
+            _selectedAddons.removeWhere((item) =>
+                item.addonId == addonId &&
+                item.optionId == oldestSelection.optionId);
+          }
+        }
+
+        // Add the new selection with a unique selection index
+        _selectedAddons.add(SelectedAddonOption(
+          addonId: addonId,
+          optionId: optionId,
+          selectionIndex: existingSelections.length,
+        ));
+      }
     });
+
+    // Update price
+    _updateCartPrice();
   }
 
-  // Get the selected flavor for a specific cake
-  String _getSelectedCakeFlavor(int cakeNumber) {
-    final flavor = _cakeFlavors.firstWhere((f) => f['cakeNumber'] == cakeNumber,
-        orElse: () => {'cakeNumber': cakeNumber, 'flavorId': ''});
-    return flavor['flavorId'];
+  // Handle dropdown selection for addons
+  void _handleAddonDropdownSelect(
+      String addonId, int dropdownIndex, String optionId) {
+    // Find the addon group to get its configuration
+    final addonGroup = _productAddons.firstWhere(
+      (addon) => addon.id == addonId,
+      orElse: () => ProductAddon(
+        id: '',
+        name: '',
+        description: '',
+        required: false,
+        minSelections: 0,
+        maxSelections: 0,
+        options: [],
+      ),
+    );
+
+    if (addonGroup.id.isEmpty) return;
+
+    setState(() {
+      // Find existing selections for this addon group
+      final existingSelections =
+          _selectedAddons.where((item) => item.addonId == addonId).toList();
+
+      // Find the existing selection at this dropdown index, if any
+      final existingSelection = existingSelections.firstWhere(
+        (item) => item.selectionIndex == dropdownIndex,
+        orElse: () => SelectedAddonOption(addonId: '', optionId: ''),
+      );
+
+      String? existingCustomText;
+
+      // If there's an existing selection at this index, preserve its custom text if the option is the same
+      if (existingSelection.addonId.isNotEmpty &&
+          existingSelection.optionId == optionId) {
+        existingCustomText = existingSelection.customText;
+      }
+
+      // Remove any existing selection for this dropdown index
+      _selectedAddons.removeWhere((item) =>
+          item.addonId == addonId && item.selectionIndex == dropdownIndex);
+
+      // Add the new selection if an option was selected (not empty)
+      if (optionId.isNotEmpty) {
+        _selectedAddons.add(SelectedAddonOption(
+          addonId: addonId,
+          optionId: optionId,
+          selectionIndex: dropdownIndex,
+          customText: existingCustomText,
+        ));
+      }
+    });
+
+    // Update price
+    _updateCartPrice();
+  }
+
+  // Handle custom text input for addon options
+  void _handleAddonCustomTextChange(
+      String addonId, String optionId, String text, int selectionIndex) {
+    // Update the custom text for this specific addon option selection
+    setState(() {
+      _addonCustomTexts['${addonId}_${optionId}_${selectionIndex}'] = text;
+
+      // Also update the selectedAddons array with the custom text
+      for (int i = 0; i < _selectedAddons.length; i++) {
+        final item = _selectedAddons[i];
+        if (item.addonId == addonId &&
+            item.optionId == optionId &&
+            (item.selectionIndex == selectionIndex)) {
+          _selectedAddons[i] = SelectedAddonOption(
+            addonId: item.addonId,
+            optionId: item.optionId,
+            customText: text,
+            selectionIndex: item.selectionIndex,
+          );
+          break;
+        }
+      }
+    });
+
+    // Update price after changing custom text
+    _updateCartPrice();
+  }
+  
+  // Helper method to create a controller with cursor at the end
+  TextEditingController _createControllerWithEndCursor(String text) {
+    final controller = TextEditingController(text: text);
+    // Set the selection to the end of the text
+    controller.selection = TextSelection.fromPosition(
+      TextPosition(offset: controller.text.length),
+    );
+    return controller;
+  }
+
+  // Custom TextField widget that properly handles text direction
+  Widget _buildCustomTextField({
+    required TextEditingController controller,
+    required Function(String) onChanged,
+    required String hintText,
+    int? maxLength,
+    InputDecoration? decoration,
+  }) {
+    return Directionality(
+      textDirection: TextDirection.ltr,
+      child: TextField(
+        controller: controller,
+        textDirection: TextDirection.ltr,
+        textAlign: TextAlign.left,
+        keyboardType: TextInputType.text,
+        decoration: decoration ?? InputDecoration(
+          hintText: hintText,
+          hintTextDirection: TextDirection.ltr,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide: BorderSide(color: Colors.grey.shade300),
+          ),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        ),
+        maxLength: maxLength ?? 50,
+        onChanged: (text) {
+          // Maintain cursor position at the end when text changes
+          final cursorPos = controller.selection.base.offset;
+          onChanged(text);
+          // Only fix cursor if it jumped to the beginning
+          if (cursorPos > 0 && controller.selection.base.offset == 0) {
+            controller.selection = TextSelection.fromPosition(
+              TextPosition(offset: text.length),
+            );
+          }
+        },
+        style: const TextStyle(
+          fontSize: 15,
+          color: Colors.black87,
+          locale: Locale('en', 'US'), // Force English locale
+        ),
+        textInputAction: TextInputAction.done,
+        strutStyle: const StrutStyle(forceStrutHeight: true), // Helps with text rendering
+      ),
+    );
+  }
+
+  // Get custom text for a specific addon option selection
+  String _getAddonCustomText(
+      String addonId, String optionId, int selectionIndex) {
+    return _addonCustomTexts['${addonId}_${optionId}_${selectionIndex}'] ?? '';
+  }
+
+  // Check if an addon option is selected
+  bool _isAddonOptionSelected(String addonId, String optionId) {
+    return _selectedAddons
+        .any((item) => item.addonId == addonId && item.optionId == optionId);
   }
 
   Widget _buildSizeOption(String size) {
@@ -507,182 +687,158 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
 
     List<Widget> variantWidgets = [];
 
-    // For Sets category, show cake flavor selection
-    if (_isSetCategory) {
-      // Get all variations from the product
-      List<ProductVariation> availableVariations = _product!.variations;
+    // Add product addons if available
+    if (_productAddons.isNotEmpty) {
+      for (var addon in _productAddons) {
+        // Skip empty addon groups
+        if (addon.options.isEmpty) continue;
 
-      // If no variations are available, don't show the UI
-      if (availableVariations.isEmpty) {
-        return const SizedBox.shrink();
-      }
-
-      // Try to get flavor variation first
-      ProductVariation? selectedVariation =
-          _product!.getVariationByType('FLAVOUR');
-
-      // If no flavor variation, use the first available variation
-      if (selectedVariation == null) {
-        selectedVariation = availableVariations.first;
-      }
-
-      List<ProductOption> variationOptions = selectedVariation.options;
-      String variationType = selectedVariation.type;
-
-      variantWidgets.add(
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Select ${variationType.capitalize()} for Each Cake',
-              style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 16),
+        // Create UI based on addon configuration
+        if (addon.maxSelections == 1) {
+          // Single selection addon - use toggle buttons
+          variantWidgets.add(
             Column(
-              children: [1, 2, 3, 4].map((cakeNumber) {
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Cake $cakeNumber ${variationType.capitalize()}',
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Container(
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Colors.grey.shade300),
-                        ),
-                        child: DropdownButtonHideUnderline(
-                          child: DropdownButton<String>(
-                            value: _getSelectedCakeFlavor(cakeNumber),
-                            isExpanded: true,
-                            hint:
-                                Text('Select a ${variationType.toLowerCase()}'),
-                            padding: const EdgeInsets.symmetric(horizontal: 12),
-                            items: variationOptions.map((option) {
-                              return DropdownMenuItem<String>(
-                                value: option.value,
-                                child: Text(option.value),
-                              );
-                            }).toList(),
-                            onChanged: (value) {
-                              if (value == null) return;
-
-                              _onCakeFlavorSelected(
-                                cakeNumber: cakeNumber,
-                                flavorId: value,
-                              );
-                            },
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              }).toList(),
-            ),
-            const SizedBox(height: 16),
-            if (!_allCakeFlavorsSelected)
-              const Text(
-                'Please select a flavor for each cake',
-                style: TextStyle(
-                  color: Colors.red,
-                  fontSize: 14,
-                ),
-              ),
-            const SizedBox(height: 24),
-          ],
-        ),
-      );
-
-      // Show selected flavors summary
-      if (_allCakeFlavorsSelected) {
-        variantWidgets.add(
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Selected Flavors',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  border: Border.all(color: Colors.grey[200]!),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
                   children: [
-                    ..._cakeFlavors.map((flavor) {
-                      final String flavorId = flavor['flavorId'];
-                      // Find the flavor option that matches the selected flavorId
-                      final flavorOption = variationOptions.firstWhere(
-                        (option) => option.value == flavorId,
-                        orElse: () => ProductOption(
-                            id: '',
-                            value: 'Not selected',
-                            priceAdjustment: 0,
-                            stock: 0),
-                      );
-
-                      final flavorName = flavorOption.value;
-
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 8),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              'Cake ${flavor['cakeNumber']}: $flavorName',
-                              style: const TextStyle(fontSize: 14),
-                            ),
-                          ],
+                    Text(
+                      addon.name,
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    if (addon.required)
+                      const Text(
+                        ' *',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.red,
                         ),
-                      );
-                    }).toList(),
-                    const Divider(),
-                    // Only show base price if not in Sets category
-                    if (!_isSetCategory)
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text(
-                            'Base Price:',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          Text(
-                            '${_product!.basePrice.toStringAsFixed(0)} AED',
-                            style: const TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
                       ),
                   ],
                 ),
-              ),
-              const SizedBox(height: 24),
-            ],
-          ),
-        );
+                if (addon.description.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4, bottom: 8),
+                    child: Text(
+                      addon.description,
+                      style: TextStyle(fontSize: 14, color: Colors.grey[700]),
+                    ),
+                  ),
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: addon.options.map((option) {
+                    final isSelected =
+                        _isAddonOptionSelected(addon.id, option.id);
+                    return InkWell(
+                      onTap: () {
+                        _handleAddonOptionSelect(addon.id, option.id);
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: isSelected ? Colors.black : Colors.white,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: isSelected
+                                ? Colors.black
+                                : Colors.grey.shade300,
+                            width: 1,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              option.name,
+                              style: TextStyle(
+                                color:
+                                    isSelected ? Colors.white : Colors.black87,
+                                fontWeight: isSelected
+                                    ? FontWeight.bold
+                                    : FontWeight.normal,
+                              ),
+                            ),
+                            if (option.price > 0)
+                              Text(
+                                ' +${option.price.toStringAsFixed(2)} AED',
+                                style: TextStyle(
+                                  color: isSelected
+                                      ? Colors.white
+                                      : Colors.black87,
+                                  fontWeight: isSelected
+                                      ? FontWeight.bold
+                                      : FontWeight.normal,
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+
+                // Custom text input for selected option that allows it
+                ..._buildCustomTextInputs(addon, 0),
+
+                const SizedBox(height: 24),
+              ],
+            ),
+          );
+        } else {
+          // Multi-selection addon - use dropdowns
+          variantWidgets.add(
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      addon.name,
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    if (addon.required)
+                      const Text(
+                        ' *',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.red,
+                        ),
+                      ),
+                  ],
+                ),
+                if (addon.description.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4, bottom: 8),
+                    child: Text(
+                      addon.description,
+                      style: TextStyle(fontSize: 14, color: Colors.grey[700]),
+                    ),
+                  ),
+                Text(
+                  'Select ${addon.minSelections > 0 ? 'at least ${addon.minSelections}' : 'up to ${addon.maxSelections}'} option${addon.maxSelections > 1 ? 's' : ''}',
+                  style: TextStyle(fontSize: 14, color: Colors.grey[700]),
+                ),
+                const SizedBox(height: 12),
+
+                // Generate dropdowns based on min/max selections
+                ..._buildDropdownSelections(addon),
+
+                const SizedBox(height: 24),
+              ],
+            ),
+          );
+        }
       }
 
       // Return early for Sets category
@@ -768,6 +924,174 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
     );
   }
 
+  // Helper method to build custom text inputs for selected addon options
+  List<Widget> _buildCustomTextInputs(ProductAddon addon, int selectionIndex) {
+    List<Widget> textInputs = [];
+
+    // Find selected options for this addon
+    final selectedOptions = _selectedAddons
+        .where((item) =>
+            item.addonId == addon.id && item.selectionIndex == selectionIndex)
+        .toList();
+
+    for (var selection in selectedOptions) {
+      // Find the option details
+      final option = addon.options.firstWhere(
+        (opt) => opt.id == selection.optionId,
+        orElse: () => AddonOption(id: '', name: '', price: 0),
+      );
+
+      // If this option allows custom text, show the input
+      if (option.allowsCustomText) {
+        textInputs.add(
+          Padding(
+            padding: const EdgeInsets.only(top: 12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  option.customTextLabel ??
+                      'Add custom text for ${option.name}',
+                  style: const TextStyle(
+                      fontSize: 14, fontWeight: FontWeight.w500),
+                ),
+                const SizedBox(height: 8),
+                _buildCustomTextField(
+                  controller: _createControllerWithEndCursor(
+                    _getAddonCustomText(addon.id, option.id, selectionIndex),
+                  ),
+                  hintText: 'Enter custom text',
+                  maxLength: option.maxTextLength ?? 50,
+                  onChanged: (text) {
+                    _handleAddonCustomTextChange(
+                        addon.id, option.id, text, selectionIndex);
+                  },
+                ),
+              ],
+            ),
+          ),
+        );
+      }
+    }
+
+    return textInputs;
+  }
+
+  // Helper method to build dropdown selections for multi-selection addons
+  List<Widget> _buildDropdownSelections(ProductAddon addon) {
+    List<Widget> dropdowns = [];
+
+    // Always use maxSelections to determine how many dropdowns to show
+    int dropdownCount = addon.maxSelections;
+
+    // If addon is required, ensure we show at least the minimum required dropdowns
+    if (addon.required && addon.minSelections > dropdownCount) {
+      dropdownCount = addon.minSelections;
+    }
+
+    // Generate dropdowns
+    for (int i = 0; i < dropdownCount; i++) {
+      // Find current selection for this dropdown index
+      final currentSelection = _selectedAddons
+          .where((item) => item.addonId == addon.id && item.selectionIndex == i)
+          .map((item) => item.optionId)
+          .firstOrNull;
+
+      dropdowns.add(
+        Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Text(
+                'Option ${i + 1}${i < addon.minSelections ? ' *' : ''}',
+                style:
+                    const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+              ),
+              const SizedBox(height: 8),
+              Container(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.grey.shade300),
+                ),
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<String>(
+                    value: currentSelection,
+                    isExpanded: true,
+                    hint: Text(
+                      'Select an option',
+                      style: const TextStyle(fontSize: 14),
+                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    items: [
+                      // Add an empty option for clearing the selection
+                      if (!addon.required || i >= addon.minSelections)
+                        const DropdownMenuItem<String>(
+                          value: '',
+                          child: Text(
+                            'None',
+                            style: const TextStyle(fontSize: 14),
+                          ),
+                        ),
+                      // Add all addon options
+                      ...addon.options.map((option) {
+                        return DropdownMenuItem<String>(
+                          value: option.id,
+                          child: Text(
+                            option.name,
+                            style: const TextStyle(fontSize: 14),
+                          ),
+                        );
+                      }),
+                    ],
+                    onChanged: (value) {
+                      if (value == null) return;
+                      _handleAddonDropdownSelect(addon.id, i, value);
+                    },
+                  ),
+                ),
+              ),
+
+              // Custom text input widget (conditionally rendered)
+              if (currentSelection != null && currentSelection.isNotEmpty)
+                Builder(builder: (context) {
+                  // Find the option details
+                  final option = addon.options.firstWhere(
+                    (opt) => opt.id == currentSelection,
+                    orElse: () => AddonOption(id: '', name: '', price: 0),
+                  );
+
+                  // Only show text input if option allows custom text
+                  if (option.allowsCustomText) {
+                    final currentText = _getAddonCustomText(addon.id, currentSelection, i);
+                    final controller = _createControllerWithEndCursor(currentText);
+                    
+                    return Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: _buildCustomTextField(
+                        controller: controller,
+                        hintText: option.customTextLabel ?? 'Add custom writing',
+                        maxLength: option.maxTextLength ?? 50,
+                        onChanged: (text) {
+                          _handleAddonCustomTextChange(
+                              addon.id, currentSelection, text, i);
+                        },
+                      ),
+                    );
+                  } else {
+                    return const SizedBox
+                        .shrink(); // Empty widget if no custom text needed
+                  }
+                })
+            ],
+          ),
+        ),
+      );
+    }
+
+    return dropdowns;
+  }
+
   Widget _buildImageGallery() {
     if (_product == null || _product!.images.isEmpty) {
       return const SizedBox.shrink();
@@ -789,12 +1113,15 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
             itemCount: _product!.images.length,
             itemBuilder: (context, index) {
               final image = _product!.images[index];
-              return Image.network(
-                image.url,
+              return CachedNetworkImage(
+                imageUrl: image.url,
                 width: double.infinity,
                 height: MediaQuery.of(context).size.height * 0.45,
                 fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) {
+                fadeInDuration: const Duration(milliseconds: 200),
+                memCacheWidth: 800, // Optimize memory cache size
+                maxWidthDiskCache: 1200, // Optimize disk cache size
+                errorWidget: (context, url, error) {
                   print('Error loading image: $error');
                   return Container(
                     color: Colors.grey[200],
@@ -803,33 +1130,21 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                     ),
                   );
                 },
-                loadingBuilder: (context, child, loadingProgress) {
-                  if (loadingProgress == null) return child;
-                  return Container(
-                    color: Colors.grey[200],
-                    child: Center(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          CircularProgressIndicator(
-                            value: loadingProgress.expectedTotalBytes != null
-                                ? loadingProgress.cumulativeBytesLoaded /
-                                    loadingProgress.expectedTotalBytes!
-                                : null,
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            'Loading image ${index + 1}/${_product!.images.length}',
-                            style: const TextStyle(
-                              color: Colors.grey,
-                              fontSize: 12,
-                            ),
-                          ),
-                        ],
-                      ),
+                placeholder: (context, url) => Container(
+                  color: Colors.grey[200],
+                  child: Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        CircularProgressIndicator(
+                          color: Theme.of(context).primaryColor,
+                        ),
+                        const SizedBox(height: 10),
+                        const Text('Loading image...'),
+                      ],
                     ),
-                  );
-                },
+                  ),
+                ),
               );
             },
           ),
@@ -897,49 +1212,71 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
     // Create a map of selected options
     Map<String, dynamic> selectedOptions = {};
 
-    // For Sets category, add cake flavors to selected options
-    if (_isSetCategory) {
-      List<Map<String, dynamic>> cakeFlavorsData = [];
-      String variationType = '';
-
-      for (var flavor in _cakeFlavors) {
-        // Ensure the flavor has a valid ID
-        if (flavor['flavorId'] != null && flavor['flavorId'].isNotEmpty) {
-          variationType = flavor['variationType'] ?? 'FLAVOUR';
-          cakeFlavorsData.add({
-            'cakeNumber': flavor['cakeNumber'],
-            'flavor': flavor['flavorId'],
-            'variationType': variationType,
-          });
-        } else {
-          // If any flavor is missing, show an error
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                  'Please select a ${variationType.toLowerCase()} for each cake'),
-              duration: const Duration(seconds: 2),
-            ),
-          );
-          return;
-        }
-      }
-      // Add cake flavors to selected options
-      selectedOptions['cakeFlavors'] = cakeFlavorsData;
-      selectedOptions['variationType'] = variationType;
-    } else {
-      // For regular products, add size and flavor
-      if (_selectedSize != null && _selectedSize!.isNotEmpty) {
-        selectedOptions['size'] = _selectedSize;
-      }
-
-      if (_selectedFlavour != null && _selectedFlavour!.isNotEmpty) {
-        selectedOptions['flavour'] = _selectedFlavour;
-      }
+    // For all products, add size and flavor
+    if (_selectedSize != null && _selectedSize!.isNotEmpty) {
+      selectedOptions['size'] = _selectedSize;
     }
 
-    // Add custom text if provided
-    if (_cakeTextController.text.isNotEmpty) {
+    if (_selectedFlavour != null && _selectedFlavour!.isNotEmpty) {
+      selectedOptions['flavour'] = _selectedFlavour;
+    }
+
+    // Add custom text if provided (only for non-Sets category)
+    if (!_isSetCategory && _cakeTextController.text.isNotEmpty) {
       selectedOptions['cakeText'] = _cakeTextController.text;
+    }
+    
+    // Add selected addons and their custom text
+    if (_selectedAddons.isNotEmpty) {
+      List<Map<String, dynamic>> addonsData = [];
+      
+      for (var selectedAddon in _selectedAddons) {
+        // Find the addon group
+        final addonGroup = _productAddons.firstWhere(
+          (addon) => addon.id == selectedAddon.addonId,
+          orElse: () => ProductAddon(
+            id: '',
+            name: '',
+            description: '',
+            required: false,
+            minSelections: 0,
+            maxSelections: 0,
+            options: [],
+          ),
+        );
+        
+        if (addonGroup.id.isEmpty) continue;
+        
+        // Find the selected option
+        final option = addonGroup.options.firstWhere(
+          (opt) => opt.id == selectedAddon.optionId,
+          orElse: () => AddonOption(id: '', name: '', price: 0),
+        );
+        
+        if (option.id.isEmpty) continue;
+        
+        // Add addon data including custom text if available
+        Map<String, dynamic> addonData = {
+          'addonId': selectedAddon.addonId,
+          'addonName': addonGroup.name,
+          'optionId': selectedAddon.optionId,
+          'optionName': option.name,
+          'price': option.price,
+          'selectionIndex': selectedAddon.selectionIndex,
+        };
+        
+        // Add custom text if available
+        if (selectedAddon.customText != null && selectedAddon.customText!.isNotEmpty) {
+          addonData['customText'] = selectedAddon.customText;
+        }
+        
+        addonsData.add(addonData);
+      }
+      
+      // Add addons data to selected options
+      if (addonsData.isNotEmpty) {
+        selectedOptions['addons'] = addonsData;
+      }
     }
 
     try {
@@ -985,13 +1322,14 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
     if (_product == null || !mounted) return;
 
     for (var image in _product!.images) {
-      await precacheImage(NetworkImage(image.url), context);
+      await precacheImage(CachedNetworkImageProvider(image.url), context);
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      resizeToAvoidBottomInset: true,
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
@@ -1117,10 +1455,12 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                                     const SizedBox(height: 24),
                                   ],
                                   _buildVariantOptions(),
-                                  if (_product!.category.name.toLowerCase() ==
-                                          'cakes' ||
-                                      _product!.category.name.toLowerCase() ==
-                                          'cake') ...[
+                                  if ((_product!.category.name.toLowerCase() ==
+                                              'cakes' ||
+                                          _product!.category.name
+                                                  .toLowerCase() ==
+                                              'cake') &&
+                                      !_isSetCategory) ...[
                                     const Text(
                                       'Add Text on Cake',
                                       style: TextStyle(
@@ -1138,13 +1478,14 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                                           width: 1,
                                         ),
                                       ),
-                                      child: TextField(
+                                      child: _buildCustomTextField(
                                         controller: _cakeTextController,
+                                        hintText: 'Enter text to be written on cake',
+                                        maxLength: 100,
                                         decoration: InputDecoration(
-                                          hintText:
-                                              'Enter text to be written on cake',
-                                          contentPadding:
-                                              const EdgeInsets.symmetric(
+                                          hintText: 'Enter text to be written on cake',
+                                          hintTextDirection: TextDirection.ltr,
+                                          contentPadding: const EdgeInsets.symmetric(
                                             horizontal: 16,
                                             vertical: 12,
                                           ),
@@ -1154,11 +1495,9 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                                             fontSize: 15,
                                           ),
                                         ),
-                                        style: const TextStyle(
-                                          fontSize: 15,
-                                        ),
-                                        maxLines: 2,
-                                        maxLength: 100,
+                                        onChanged: (text) {
+                                          setState(() {});
+                                        },
                                       ),
                                     ),
                                     const SizedBox(height: 24),
@@ -1175,7 +1514,12 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
           ? null
           : SafeArea(
               child: Padding(
-                padding: const EdgeInsets.all(16),
+                // Add padding to ensure button stays above keyboard
+                padding: EdgeInsets.only(
+                  left: 16,
+                  right: 16,
+                  bottom: 16 + MediaQuery.of(context).viewInsets.bottom,
+                ),
                 child: Row(
                   children: [
                     Expanded(

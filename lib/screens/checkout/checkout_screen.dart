@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../payment/payment_screen.dart';
 import '../../services/cart_service.dart';
 import '../../services/api_service.dart';
@@ -8,7 +9,7 @@ import '../../models/customer_details.dart';
 import '../../models/cart_item.dart'; // Added CartItem import
 import 'dart:math'; // Added dart:math import for max/min functions
 import 'dart:convert'; // Added import for dart:convert
-import 'package:firebase_auth/firebase_auth.dart'; // Added import for Firebase Authentication
+import 'package:intl_phone_field/intl_phone_field.dart';
 
 enum DeliveryMethod { storePickup, standardDelivery }
 
@@ -38,6 +39,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   final _emailController = TextEditingController();
   final _phoneController = TextEditingController();
   final _streetController = TextEditingController();
+  bool _phoneReadOnly = false;
+  String _completePhoneNumber = '';
   final _apartmentController = TextEditingController();
   final _cityController = TextEditingController();
   final _pincodeController = TextEditingController();
@@ -52,7 +55,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   bool _firstNameReadOnly = false;
   bool _lastNameReadOnly = false;
   bool _emailReadOnly = false;
-  bool _phoneReadOnly = false;
 
   // UAE Emirates with proper formatting for both UI display and backend compatibility
   final List<String> _emirates = [
@@ -63,6 +65,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     'Umm Al Quwain',
     'Ras Al Khaimah',
     'Fujairah',
+    'Al Ain'
   ];
 
   // Backend format for emirates (used for API calls)
@@ -74,6 +77,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     'Umm Al Quwain': 'UMM_AL_QUWAIN',
     'Ras Al Khaimah': 'RAS_AL_KHAIMAH',
     'Fujairah': 'FUJAIRAH',
+    'Al Ain': 'AL_AIN'
   };
 
   String? _selectedEmirate; // For UI display
@@ -128,10 +132,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     ],
     'Al Ain': [
       {
-        'slot': '4pm-10pm',
-        'cutoff': '20:00',
-        'nextDay': true
-      }, // 8pm previous day
+        'slot': '5pm-9:30pm',
+        'cutoff': '11:00',
+        'nextDay': false
+      }, // 11am same day
     ],
     'Ras Al Khaimah': [
       {
@@ -169,14 +173,13 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   Address? _selectedAddress;
   CustomerDetails? _customerDetails;
   bool _isPointsRedeemed = false;
-  static const double POINTS_REDEMPTION_RATE = 1 / 4; // 4 points = 1 AED
+  // Redemption rate is 3 points = 1 AED (implemented directly in calculations)
   double _total = 0;
   bool _isGift = false;
 
   @override
   void initState() {
     super.initState();
-    _checkAuthentication();
     _loadCustomerDetails();
     _phoneReadOnly = false; // Make phone number always editable
     _calculateTotal(); // Initialize total on startup
@@ -184,24 +187,16 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     // Initialize emirate with a valid value from the _emirates list
     _selectedEmirate = _emirates[1]; // Dubai is at index 1
 
+    // Add a delayed refresh to ensure we get the latest reward points
+    Future.delayed(const Duration(seconds: 1), () {
+      _loadCustomerDetails();
+    });
+
     // Initialize recipient phone with UAE country code
     _giftRecipientPhoneController.text = '+971 ';
   }
 
-  Future<void> _checkAuthentication() async {
-    final token = await FirebaseAuth.instance.currentUser?.getIdToken();
-    if (token == null) {
-      if (!mounted) return;
-      // Show a message and navigate to login
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please login to continue with checkout'),
-          duration: Duration(seconds: 2),
-        ),
-      );
-      Navigator.pushReplacementNamed(context, '/login');
-    }
-  }
+  // Authentication is now handled in the _loadCustomerDetails method
 
   double _calculateSubTotal() {
     double subtotal = 0;
@@ -249,76 +244,192 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   double _calculatePointsDiscount() {
+    // If coupon is applied, points cannot be redeemed
+    if (_isCouponApplied) {
+      // If user tries to redeem points while coupon is applied, show message and reset
+      if (_isPointsRedeemed) {
+        setState(() {
+          _isPointsRedeemed = false;
+          pointsController.clear();
+        });
+        // Show toast message explaining the restriction
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text(
+              'You cannot use reward points and coupon together. Please choose one.',
+              style: TextStyle(fontSize: 16),
+            ),
+            backgroundColor: Colors.orange[700],
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+      return 0;
+    }
+
     if (!_isPointsRedeemed || _customerDetails == null) return 0;
 
-    final pointsToRedeem = int.tryParse(pointsController.text) ?? 0;
-    if (pointsToRedeem <= 0) return 0;
+    // Always use all available points, but ensure it's a whole number
+    final pointsToRedeem = _customerDetails!.rewardPoints;
+    if (pointsToRedeem < 3) return 0; // Need at least 3 points to redeem 1 AED
 
-    // Calculate points value (4 points = 1 AED)
-    final pointsValue = pointsToRedeem * POINTS_REDEMPTION_RATE;
+    // Calculate how many whole AED can be redeemed (3 points = 1 AED)
+    // We need to ensure we only redeem points in multiples of 3
+    final wholePointsToRedeem =
+        (pointsToRedeem ~/ 3) * 3; // Round down to nearest multiple of 3
+    final wholeAedValue =
+        wholePointsToRedeem ~/ 3; // Integer division to get whole AED value
 
-    // Ensure points discount doesn't exceed remaining total after coupon
-    final remainingTotal =
-        _calculateSubTotal() - (_isCouponApplied ? _couponDiscount : 0);
-    return min(pointsValue, remainingTotal);
+    print('Points available: $pointsToRedeem');
+    print('Whole points to redeem: $wholePointsToRedeem');
+    print('Whole AED value: $wholeAedValue');
+
+    // Update the points controller to show the actual points being redeemed
+    if (_isPointsRedeemed) {
+      pointsController.text = wholePointsToRedeem.toString();
+    }
+
+    // Ensure points discount doesn't exceed remaining total
+    final remainingTotal = _calculateSubTotal();
+    return min(wholeAedValue.toDouble(), remainingTotal);
   }
 
   Future<void> _loadCustomerDetails() async {
     try {
-      final response = await _apiService.sendRequest(
-        '/customers/profile',
-        method: 'GET',
-      );
+      // Clear all caches to ensure we get fresh data
+      _apiService.clearCustomerDetailsCache();
+      _apiService.clearRewardsCache();
 
-      if (response.statusCode != 200 || response.data == null) {
-        throw Exception('Failed to load customer details');
-      }
+      print('Cleared all caches to ensure fresh data');
 
-      final customerData = response.data['data'];
+      // First, fetch customer details
+      var customerDetails =
+          await _apiService.getCustomerDetails(forceRefresh: true);
 
-      setState(() {
-        // Set customer details
-        _customerDetails = CustomerDetails(
-          id: customerData['id'],
-          firstName: customerData['firstName'],
-          lastName: customerData['lastName'],
-          email: customerData['email'],
-          phone: customerData['phone'] ?? '',
-          rewardPoints: customerData['rewardPoints'] ?? 0,
+      // Debug output to check reward points
+      print('Customer details loaded successfully with force refresh');
+      print('Initial reward points from API: ${customerDetails.rewardPoints}');
+      print('Customer ID: ${customerDetails.id}');
+
+      // Now fetch rewards directly from the rewards endpoint (this is how the website does it)
+      print('Fetching rewards directly from rewards endpoint...');
+      final customerReward = await _apiService.getCustomerRewards();
+
+      if (customerReward != null) {
+        print('Successfully fetched customer rewards');
+        print('Reward points: ${customerReward.points}');
+        print('Reward tier: ${customerReward.tier}');
+
+        // Update customer details with the reward points from the rewards endpoint
+        customerDetails = CustomerDetails(
+          id: customerDetails.id,
+          firstName: customerDetails.firstName,
+          lastName: customerDetails.lastName,
+          email: customerDetails.email,
+          phone: customerDetails.phone,
+          birthDate: customerDetails.birthDate,
+          isEmailVerified: customerDetails.isEmailVerified,
+          rewardPoints: customerReward.points,
+          rewardTier: customerReward.tier
+              .toString()
+              .split('.')
+              .last, // Convert enum to string
+          imageUrl: customerDetails.imageUrl,
+          provider: customerDetails.provider,
         );
 
-        // Set form fields
-        _firstNameController.text = customerData['firstName'];
-        _lastNameController.text = customerData['lastName'];
-        _emailController.text = customerData['email'];
+        print(
+            'Updated customer details with reward points: ${customerDetails.rewardPoints}');
+      } else {
+        print(
+            'Failed to fetch customer rewards, using customer details reward points');
 
-        // Format phone number with UAE country code
-        String phone = customerData['phone'] ?? '';
-        if (!phone.startsWith('+971')) {
-          phone = phone.startsWith('0')
-              ? '+971${phone.substring(1)}'
-              : '+971$phone';
+        // Try one more time with a direct API call as a fallback
+        try {
+          print('Attempting direct API call as fallback...');
+          final response = await _apiService.sendRequest(
+            '/rewards',
+            method: 'GET',
+          );
+
+          if (response.statusCode == 200 && response.data['success'] == true) {
+            final rewardData = response.data['data'];
+            print('Direct API call reward data: ${json.encode(rewardData)}');
+
+            if (rewardData != null && rewardData is Map<String, dynamic>) {
+              int points = 0;
+              if (rewardData.containsKey('points')) {
+                if (rewardData['points'] is int) {
+                  points = rewardData['points'];
+                } else if (rewardData['points'] is String) {
+                  points = int.tryParse(rewardData['points']) ?? 0;
+                }
+              }
+
+              if (points > 0) {
+                print(
+                    'Successfully fetched points from direct API call: $points');
+                customerDetails = CustomerDetails(
+                  id: customerDetails.id,
+                  firstName: customerDetails.firstName,
+                  lastName: customerDetails.lastName,
+                  email: customerDetails.email,
+                  phone: customerDetails.phone,
+                  birthDate: customerDetails.birthDate,
+                  isEmailVerified: customerDetails.isEmailVerified,
+                  rewardPoints: points,
+                  rewardTier: customerDetails.rewardTier,
+                  imageUrl: customerDetails.imageUrl,
+                  provider: customerDetails.provider,
+                );
+              }
+            }
+          }
+        } catch (e) {
+          print('Error in fallback API call: $e');
         }
-        _phoneController.text = phone;
+      }
+
+      // Set customer details from the API response
+      _customerDetails = customerDetails;
+
+      // Load addresses separately
+      try {
+        final addresses = await _apiService.getAddresses();
+        if (addresses.isNotEmpty) {
+          _savedAddresses = addresses;
+        }
+      } catch (e) {
+        print('Error loading addresses: $e');
+        _savedAddresses = [];
+      }
+
+      // Update the UI
+      setState(() {
+        // Set form fields from the customer details
+        _firstNameController.text = customerDetails.firstName;
+        _lastNameController.text = customerDetails.lastName;
+        _emailController.text = customerDetails.email;
+
+        // Format phone number for the phone field
+        String phone = customerDetails.phone ?? '';
+        if (phone.startsWith('+971')) {
+          // Remove country code for the controller since IntlPhoneField handles it
+          _phoneController.text = phone.substring(4);
+          _completePhoneNumber = phone;
+        } else if (phone.startsWith('0')) {
+          _phoneController.text = phone.substring(1);
+          _completePhoneNumber = '+971${phone.substring(1)}';
+        } else {
+          _phoneController.text = phone;
+          _completePhoneNumber = '+971$phone';
+        }
 
         // Make fields read-only except phone
         _firstNameReadOnly = true;
         _lastNameReadOnly = true;
         _emailReadOnly = true;
         _phoneReadOnly = false;
-
-        // Set addresses
-        _savedAddresses = (customerData['addresses'] as List)
-            .map((addr) => Address(
-                  name: 'Billing Address',
-                  street: addr['street'],
-                  apartment: addr['apartment'] ?? '',
-                  emirate: addr['emirate'],
-                  city: addr['city'],
-                  pincode: addr['pincode'] ?? '',
-                  isDefault: addr['isDefault'] ?? false,
-                ))
-            .toList();
 
         // Set default address if available
         if (_savedAddresses.isNotEmpty) {
@@ -365,7 +476,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       firstDate = today.add(const Duration(days: 1));
     }
 
-    final lastDate = today.add(const Duration(days: 30));
+    // Allow selection of dates up to 2 years in the future
+    final lastDate = today.add(const Duration(days: 365 * 2));
 
     final picked = await showDatePicker(
       context: context,
@@ -490,17 +602,40 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   Future<void> _validateCoupon(String code) async {
-    final couponCode = _couponController.text.trim();
-    if (couponCode.isEmpty) {
-      _showMessage('Please enter a coupon code', isError: true);
+    // Check if reward points are being used
+    if (_isPointsRedeemed) {
+      setState(() {
+        _isValidatingCoupon = false;
+        _couponError =
+            'You cannot use coupon and reward points together. Please remove reward points first.';
+        _couponController.clear();
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text(
+            'You cannot use coupon and reward points together. Please remove reward points first.',
+            style: TextStyle(fontSize: 16),
+          ),
+          backgroundColor: Colors.orange[700],
+          duration: const Duration(seconds: 3),
+        ),
+      );
       return;
     }
 
     setState(() {
       _isValidatingCoupon = true;
-      _couponError = null;
-      _couponDiscount = 0;
+      _couponError = '';
     });
+
+    final couponCode = code.trim();
+    if (couponCode.isEmpty) {
+      setState(() {
+        _isValidatingCoupon = false;
+        _couponError = 'Please enter a coupon code';
+      });
+      return;
+    }
 
     try {
       final subtotal = _calculateSubTotal(); // Use subtotal for validation
@@ -509,13 +644,38 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       final data = response.data['data'];
 
       if (data != null) {
+        // If points were being redeemed, automatically uncheck them
+        if (_isPointsRedeemed) {
+          setState(() {
+            _isPointsRedeemed = false;
+            pointsController.clear();
+          });
+        }
+
         setState(() {
           _appliedCouponCode = couponCode;
           _isCouponApplied = true;
           _couponDiscount = (data['discount'] as num).toDouble();
-          _showMessage('Coupon applied successfully!', isError: false);
+          _isValidatingCoupon = false;
         });
+
         _calculateTotal();
+
+        // Show a notification that reward points cannot be used with coupon
+        if (_customerDetails != null && _customerDetails!.rewardPoints >= 3) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text(
+                'Coupon applied. Note: You cannot use reward points with this coupon.',
+                style: TextStyle(fontSize: 16),
+              ),
+              backgroundColor: Colors.blue[700],
+              duration: const Duration(seconds: 3),
+            ),
+          );
+        } else {
+          _showMessage('Coupon applied successfully!', isError: false);
+        }
       }
     } on ApiException catch (e) {
       print('ApiException during coupon validation: ${e.message}');
@@ -545,11 +705,27 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   void _removeCoupon() {
     setState(() {
-      _appliedCouponCode = null;
-      _couponDiscount = 0;
       _isCouponApplied = false;
+      _couponDiscount = 0;
+      _appliedCouponCode = null;
       _couponController.clear();
+      _couponError = '';
     });
+    _calculateTotal();
+
+    // Show a toast message to inform the user they can now use reward points
+    if (_customerDetails != null && _customerDetails!.rewardPoints >= 3) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text(
+            'Coupon removed. You can now use your reward points.',
+            style: TextStyle(fontSize: 16),
+          ),
+          backgroundColor: Colors.green[700],
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    }
   }
 
   bool _validateGiftFields() {
@@ -816,6 +992,34 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     }
   }
 
+  // Process addons for order items, showing only name and custom text
+  List<Map<String, dynamic>> _processAddonsForOrderItem(List<dynamic> addons) {
+    // Create a map to track unique addon options by their ID
+    final Map<String, dynamic> uniqueAddons = {};
+
+    // Process each addon and keep only unique ones
+    for (var addon in addons) {
+      final String uniqueKey = '${addon['addonId']}_${addon['optionId']}';
+      uniqueAddons[uniqueKey] = addon;
+    }
+
+    // Convert back to list with simplified format
+    return uniqueAddons.values.map((addon) {
+      // Only include name and custom text
+      final Map<String, dynamic> processedAddon = {
+        'name': addon['optionName'],
+      };
+
+      // Add custom text if available
+      String? customText = addon['customText']?.toString();
+      if (customText != null && customText.isNotEmpty) {
+        processedAddon['customText'] = customText;
+      }
+
+      return processedAddon;
+    }).toList();
+  }
+
   Map<String, dynamic> _buildOrderData() {
     final subtotal = _calculateSubTotal();
     final total = _calculateTotal();
@@ -854,7 +1058,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       'firstName': _firstNameController.text.trim(),
       'lastName': _lastNameController.text.trim(),
       'email': _emailController.text.trim(),
-      'phone': _phoneController.text.trim(),
+      'phone': _completePhoneNumber.isNotEmpty
+          ? _completePhoneNumber
+          : _phoneController.text.trim(),
       'idempotencyKey': DateTime.now().millisecondsSinceEpoch.toString(),
       'deliveryMethod': _selectedDeliveryMethod == DeliveryMethod.storePickup
           ? 'PICKUP'
@@ -872,6 +1078,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 'price': item.totalPrice.floor(),
                 'quantity': item.quantity,
                 'cakeWriting': item.cakeText ?? '',
+                // Add addon information if available
+                if (item.selectedOptions.containsKey('addons'))
+                  'addons': _processAddonsForOrderItem(
+                      item.selectedOptions['addons']),
               })
           .toList(),
       'subtotal': subtotal.floor(),
@@ -983,7 +1193,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                       padding: const EdgeInsets.symmetric(vertical: 16),
                     ),
                     child: Text(
-                      'Place Order - ${_cartService.totalPrice.toStringAsFixed(2)} AED',
+                      'Place Order - ${_total.toStringAsFixed(2)} AED',
                       style: const TextStyle(fontSize: 18),
                     ),
                   ),
@@ -996,30 +1206,27 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   Widget _buildSectionTitle(String title) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-      decoration: BoxDecoration(
-        color: Colors.grey[50],
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey[300]!),
-      ),
-      child: Row(
+      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 0),
+      margin: const EdgeInsets.only(bottom: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            width: 4,
-            height: 24,
-            decoration: BoxDecoration(
-              color: Colors.grey[800],
-              borderRadius: BorderRadius.circular(2),
-            ),
-          ),
-          const SizedBox(width: 12),
           Text(
             title,
             style: const TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.w600,
-              letterSpacing: 0.5,
+              letterSpacing: 0.2,
               color: Colors.black87,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Container(
+            width: 40, // Half-width underline
+            height: 2,
+            decoration: BoxDecoration(
+              color: Colors.black87,
+              borderRadius: BorderRadius.circular(1),
             ),
           ),
         ],
@@ -1031,7 +1238,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildSectionTitle('Contact Information'),
+        _buildSectionTitle('Contact'),
         const SizedBox(height: 16),
         Row(
           children: [
@@ -1081,22 +1288,48 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           },
         ),
         const SizedBox(height: 16),
-        _buildTextField(
-          controller: _phoneController,
-          label: 'Phone Number',
-          readOnly: _phoneReadOnly,
-          keyboardType: TextInputType.phone,
-          validator: (value) {
-            if (value == null || value.isEmpty) {
-              return 'Phone number is required';
-            }
-            // Validate UAE phone number format
-            if (!RegExp(r'^\+971[0-9]{9}$')
-                .hasMatch(value.replaceAll(RegExp(r'[\s\-()]'), ''))) {
-              return 'Please enter a valid UAE phone number (+971XXXXXXXXX)';
-            }
-            return null;
-          },
+        Padding(
+          padding: const EdgeInsets.only(bottom: 8.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Phone Number',
+                style: TextStyle(fontSize: 14, color: Colors.grey[700]),
+              ),
+              const SizedBox(height: 8),
+              IntlPhoneField(
+                controller: _phoneController,
+                decoration: InputDecoration(
+                  hintText: 'Phone Number',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: Colors.grey[300]!),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: Colors.black),
+                  ),
+                ),
+                initialCountryCode: 'AE',
+                readOnly: _phoneReadOnly,
+                enabled: !_phoneReadOnly,
+                disableLengthCheck: true,
+                onChanged: (phone) {
+                  _completePhoneNumber = phone.completeNumber;
+                },
+                validator: (phone) {
+                  if (phone == null || phone.number.isEmpty) {
+                    return 'Phone number is required';
+                  }
+                  return null;
+                },
+              ),
+            ],
+          ),
         ),
       ],
     );
@@ -1595,7 +1828,13 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   Widget _buildRewardPointsSection() {
     // Calculate points to be earned based on tier rate
     double pointRate = 0.07; // Default GREEN tier rate
+
+    // Debug output for reward points in the UI
+    print(
+        'Building rewards section with customer details: ${_customerDetails != null}');
     if (_customerDetails != null) {
+      print('Current reward points: ${_customerDetails!.rewardPoints}');
+
       switch (_customerDetails!.rewardTier) {
         case 'PLATINUM':
           pointRate = 0.20; // 20%
@@ -1611,9 +1850,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       }
     }
 
-    // Calculate points based on total before any discounts (includes delivery)
+    // Calculate points based on total BEFORE any discounts (includes delivery)
     // For example: 100 AED * 0.07 = 7 points for GREEN tier
-    int pointsToEarn = (_calculateTotalBeforeDiscounts() * pointRate).floor();
+    // Always use the original total regardless of coupons to ensure consistent points earning
+    double originalTotal = _calculateTotalBeforeDiscounts();
+    int pointsToEarn = (originalTotal * pointRate).floor();
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -1636,6 +1877,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               fontWeight: FontWeight.w500,
             ),
           ),
+
+          // Always show reward points info if customer is logged in
           if (_customerDetails != null) ...[
             const SizedBox(height: 8),
             Text(
@@ -1645,74 +1888,213 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 fontWeight: FontWeight.w500,
               ),
             ),
-            Text(
-              'Earn ${(pointRate * 100).toStringAsFixed(0)}% points on every order',
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey[600],
-              ),
-            ),
           ],
-          if (_customerDetails != null &&
-              _customerDetails!.rewardPoints > 0) ...[
-            const SizedBox(height: 16),
-            Text(
-              'Available Points: ${_customerDetails!.rewardPoints}',
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
+          // Debug information about reward points
+          if (_customerDetails != null) ...[
             const SizedBox(height: 8),
-            Text(
-              'You can redeem your points for a discount (4 points = 1 AED)',
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey[600],
-              ),
+            Row(
+              children: [
+                Text(
+                  'Your available points: ',
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                Text(
+                  '${_customerDetails!.rewardPoints}',
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.blue,
+                  ),
+                ),
+              ],
             ),
+            if (_customerDetails!.rewardPoints >= 3) ...[
+              const SizedBox(height: 4),
+              Row(
+                children: [
+                  Text(
+                    'Equivalent to: ',
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  Text(
+                    'AED ${_customerDetails!.rewardPoints ~/ 3}',
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.green,
+                    ),
+                  ),
+                  Text(
+                    ' (3 points = 1 AED)',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontStyle: FontStyle.italic,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ],
+
+          // Only show the rewards redemption option if customer has enough points to redeem (at least 3 points = 1 AED)
+          // and no coupon is applied
+          if (_customerDetails != null &&
+              _customerDetails!.rewardPoints >= 3 &&
+              !_isCouponApplied) ...[
             const SizedBox(height: 16),
             Row(
               children: [
-                Expanded(
-                  child: TextField(
-                    controller: pointsController,
-                    keyboardType: TextInputType.number,
-                    decoration: InputDecoration(
-                      labelText: 'Points to Redeem',
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      enabled: !_isPointsRedeemed,
-                    ),
-                  ),
+                Checkbox(
+                  value: _isPointsRedeemed,
+                  onChanged: (value) {
+                    // If coupon is applied, show message and don't allow points redemption
+                    if (_isCouponApplied && (value ?? false)) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: const Text(
+                            'You cannot use reward points and coupon together. Please remove coupon first.',
+                            style: TextStyle(fontSize: 16),
+                          ),
+                          backgroundColor: Colors.orange[700],
+                          duration: const Duration(seconds: 3),
+                        ),
+                      );
+                      return;
+                    }
+
+                    setState(() {
+                      _isPointsRedeemed = value ?? false;
+                      if (!_isPointsRedeemed) {
+                        pointsController.clear();
+                      } else {
+                        // Always use all available points
+                        pointsController.text =
+                            _customerDetails!.rewardPoints.toString();
+                      }
+                      _calculateTotal(); // Update total when checkbox changes
+                    });
+                  },
                 ),
-                const SizedBox(width: 16),
-                ElevatedButton(
-                  onPressed: _isPointsRedeemed
-                      ? () {
-                          setState(() {
-                            _isPointsRedeemed = false;
-                            pointsController.clear();
-                          });
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () {
+                      // If coupon is applied, show message and don't allow points redemption
+                      if (_isCouponApplied && !_isPointsRedeemed) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: const Text(
+                              'You cannot use reward points and coupon together. Please remove coupon first.',
+                              style: TextStyle(fontSize: 16),
+                            ),
+                            backgroundColor: Colors.orange[700],
+                            duration: const Duration(seconds: 3),
+                          ),
+                        );
+                        return;
+                      }
+
+                      setState(() {
+                        _isPointsRedeemed = !_isPointsRedeemed;
+                        if (!_isPointsRedeemed) {
+                          pointsController.clear();
+                        } else {
+                          // Default to using all available points
+                          pointsController.text =
+                              _customerDetails!.rewardPoints.toString();
                         }
-                      : () {
-                          if (pointsController.text.isNotEmpty) {
-                            setState(() {
-                              _isPointsRedeemed = true;
-                            });
-                          }
-                        },
-                  style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 24, vertical: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+                        _calculateTotal(); // Update total when checkbox changes
+                      });
+                    },
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Use my rewards points (${_customerDetails!.rewardPoints} available)',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w500,
+                            color: _isPointsRedeemed
+                                ? Colors.black
+                                : _isCouponApplied
+                                    ? Colors.grey[
+                                        400] // Dimmed if coupon is applied
+                                    : Colors.grey[700],
+                          ),
+                        ),
+                        Text(
+                          'Value: AED ${(_customerDetails!.rewardPoints ~/ 3)}', // Calculate whole AED value (3 points = 1 AED)
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.green,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  child: Text(_isPointsRedeemed ? 'Remove' : 'Redeem'),
                 ),
               ],
+            ),
+            if (_isPointsRedeemed && !_isCouponApplied) ...[
+              const SizedBox(height: 8),
+              Text(
+                'Redeeming ${((_customerDetails!.rewardPoints ~/ 3) * 3)} points (3 points = 1 AED)',
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              Text(
+                'Discount: AED ${_calculatePointsDiscount().toInt()}',
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.green,
+                ),
+              ),
+            ],
+          ],
+          // Add a note about coupon and points restriction if coupon is applied
+          if (_isCouponApplied &&
+              _customerDetails != null &&
+              _customerDetails!.rewardPoints >= 3) ...[
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.grey[50],
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.grey[300]!),
+              ),
+              child: Text(
+                'Note: You cannot use reward points and coupon together. Please remove coupon first.',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.grey[600],
+                ),
+              ),
+            ),
+          ],
+          // Show message if customer has no reward points
+          if (_customerDetails != null &&
+              _customerDetails!.rewardPoints == 0) ...[
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.grey[50],
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.grey[300]!),
+              ),
+              child: const Text('You have 0 reward points available',
+                  style: TextStyle(color: Colors.grey, fontSize: 14)),
             ),
           ],
         ],
@@ -1948,9 +2330,26 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                       child: item.product.imageUrl != null
                           ? ClipRRect(
                               borderRadius: BorderRadius.circular(8),
-                              child: Image.network(
-                                item.product.imageUrl!,
+                              child: CachedNetworkImage(
+                                imageUrl: item.product.imageUrl!,
                                 fit: BoxFit.cover,
+                                fadeInDuration:
+                                    const Duration(milliseconds: 200),
+                                memCacheWidth:
+                                    400, // Optimize memory cache size
+                                placeholder: (context, url) => Container(
+                                  color: Colors.grey[100],
+                                  child: const Center(
+                                    child: CircularProgressIndicator(),
+                                  ),
+                                ),
+                                errorWidget: (context, url, error) => Container(
+                                  color: Colors.grey[200],
+                                  child: const Center(
+                                    child: Icon(Icons.error_outline,
+                                        color: Colors.grey),
+                                  ),
+                                ),
                               ),
                             )
                           : const Icon(Icons.cake,
@@ -1989,6 +2388,61 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                               ),
                             ),
                           ],
+                          // Display selected addons if available
+                          if (item.selectedOptions.containsKey('addons')) ...[
+                            const SizedBox(height: 4),
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Selected Addons:',
+                                  style: TextStyle(
+                                    color: Colors.grey[600],
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                // Process addons to remove duplicates and simplify display
+                                ...(() {
+                                  // Create a map to track unique addon options by their ID
+                                  final Map<String, dynamic> uniqueAddons = {};
+
+                                  // Process each addon and keep only unique ones
+                                  for (var addon
+                                      in (item.selectedOptions['addons']
+                                          as List<dynamic>)) {
+                                    final String uniqueKey =
+                                        '${addon['addonId']}_${addon['optionId']}';
+                                    uniqueAddons[uniqueKey] = addon;
+                                  }
+
+                                  // Convert back to list and map to widgets
+                                  return uniqueAddons.values.map((addon) {
+                                    // Simplified display - just option name
+                                    String addonText = addon['optionName'];
+
+                                    // Add custom text if available
+                                    String? customText =
+                                        addon['customText']?.toString();
+                                    if (customText != null &&
+                                        customText.isNotEmpty) {
+                                      addonText += ' - "$customText"';
+                                    }
+
+                                    return Text(
+                                      addonText,
+                                      style: TextStyle(
+                                        color: Colors.grey[600],
+                                        fontSize: 12,
+                                      ),
+                                    );
+                                  }).toList();
+                                })(),
+                              ],
+                            ),
+                          ],
+
                           // Display selected options for cake flavors
                           if (item.selectedOptions
                               .containsKey('cakeFlavors')) ...[
@@ -2021,17 +2475,19 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                             ),
                           ],
                           // Display other selected options
+                          // Display other selected options (excluding addons, cake flavors, and cake text)
                           if (item.selectedOptions.isNotEmpty &&
                               !item.selectedOptions
                                   .containsKey('cakeFlavors') &&
-                              !item.selectedOptions
-                                  .containsKey('cakeText')) ...[
+                              !item.selectedOptions.containsKey('cakeText') &&
+                              !item.selectedOptions.containsKey('addons')) ...[
                             const SizedBox(height: 4),
                             ...item.selectedOptions.entries
                                 .where((entry) =>
                                     entry.key != 'variationType' &&
                                     entry.key != 'size' &&
-                                    entry.key != 'flavour')
+                                    entry.key != 'flavour' &&
+                                    entry.key != 'addons')
                                 .map((entry) {
                               return Text(
                                 '${entry.key.substring(0, 1).toUpperCase()}${entry.key.substring(1)}: ${entry.value}',

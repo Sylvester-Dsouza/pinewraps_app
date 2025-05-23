@@ -6,6 +6,7 @@ import 'edit_profile_screen.dart';
 import '../orders/order_history_screen.dart';
 import './rewards_screen.dart';
 import '../auth/login_screen.dart';
+import '../main_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -34,15 +35,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     if (_isAuthenticated) {
       _loadUserProfile();
-    } else {
-      // If not authenticated, navigate to login screen
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => const LoginScreen()),
-        );
-      });
     }
+    // No longer automatically redirecting to login screen
+    // Instead, we'll show a login prompt in the build method
   }
 
   Future<void> _loadUserProfile() async {
@@ -194,6 +189,71 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
+  // Widget to show when user is not logged in
+  Widget _buildLoginPrompt() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(
+            Icons.account_circle,
+            size: 100,
+            color: Colors.grey,
+          ),
+          const SizedBox(height: 24),
+          const Text(
+            'Please sign in to access your profile',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Sign in to view your orders, addresses, and rewards',
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.grey,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 32),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const LoginScreen()),
+              );
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.black,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 48, vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            child: const Text('Sign In'),
+          ),
+          const SizedBox(height: 16),
+          TextButton(
+            onPressed: () {
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (context) => const MainScreen()),
+              );
+            },
+            child: const Text(
+              'Continue shopping',
+              style: TextStyle(color: Colors.grey),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -210,7 +270,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
         ),
       ),
-      body: ListView(
+      body: !_isAuthenticated 
+          ? _buildLoginPrompt()
+          : ListView(
         children: [
           _buildUserInfo(),
           const SizedBox(height: 20),

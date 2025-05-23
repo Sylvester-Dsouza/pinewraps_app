@@ -1,7 +1,4 @@
-enum AddressType {
-  SHIPPING,
-  BILLING
-}
+enum AddressType { SHIPPING, BILLING }
 
 class Address {
   String? id;
@@ -25,7 +22,8 @@ class Address {
     'AJMAN',
     'UMM_AL_QUWAIN',
     'RAS_AL_KHAIMAH',
-    'FUJAIRAH'
+    'FUJAIRAH',
+    'AL_AIN'
   ];
 
   static String formatEmirateForDisplay(String emirate) {
@@ -84,8 +82,12 @@ class Address {
           (e) => e.toString() == 'AddressType.$typeStr',
           orElse: () => AddressType.SHIPPING,
         ),
-        createdAt: json['createdAt'] != null ? DateTime.parse(json['createdAt']) : null,
-        updatedAt: json['updatedAt'] != null ? DateTime.parse(json['updatedAt']) : null,
+        createdAt: json['createdAt'] != null
+            ? DateTime.parse(json['createdAt'])
+            : null,
+        updatedAt: json['updatedAt'] != null
+            ? DateTime.parse(json['updatedAt'])
+            : null,
       );
     } catch (e) {
       print('Error parsing address from JSON: $e');

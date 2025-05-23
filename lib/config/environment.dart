@@ -6,17 +6,17 @@ enum Environment {
 
 class EnvironmentConfig {
   // Current environment
-  static Environment _environment = Environment.development;
+  static Environment _environment = Environment.production;
 
   // Base URLs for different environments
   static const String _baseLocalUrl = 'http://localhost:3001';
   static String _baseLocalNetworkUrl =
       'http://localhost:3001'; // Will be set dynamically
-  static const String _baseEmulatorUrl = 'http://10.0.2.2:3001';
+  static const String _baseEmulatorUrl = 'http://192.168.1.33:3001';
   static const String _baseProductionUrl = 'https://pinewraps-api.onrender.com';
 
   // Use emulator flag
-  static bool _useEmulator = false;
+  static bool _useEmulator = true;
 
   // Use physical device flag
   static bool _usePhysicalDevice = true;

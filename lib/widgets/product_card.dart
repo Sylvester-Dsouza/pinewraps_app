@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../models/product.dart';
 import '../screens/product/product_details_screen.dart';
 
@@ -27,11 +28,8 @@ class ProductCard extends StatelessWidget {
       },
       child: LayoutBuilder(
         builder: (context, constraints) {
-          // Calculate available space for details section
-          final totalHeight = constraints.maxHeight;
-          // Reserve 60% for image, 40% for details
-          final imageHeight = totalHeight * 0.6;
-          final detailsHeight = totalHeight * 0.4;
+          // No need to calculate dimensions - we'll use AspectRatio for the image
+          // and Expanded for the details section
           
           return Container(
             width: width ?? double.infinity,
@@ -50,36 +48,47 @@ class ProductCard extends StatelessWidget {
               mainAxisSize: MainAxisSize.max, // Fill the available space
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Product Image - Using percentage of total height
-                SizedBox(
-                  width: constraints.maxWidth,
-                  height: imageHeight,
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      image: product.imageUrl != null
-                        ? DecorationImage(
-                            image: NetworkImage(product.imageUrl!),
-                            fit: BoxFit.cover,
-                          )
-                        : null,
-                    ),
-                    child: product.imageUrl == null
-                      ? const Center(
+                // Product Image - Using perfect 1:1 aspect ratio
+                AspectRatio(
+                  aspectRatio: 1.0, // Perfect square (1:1 ratio)
+                  child: product.imageUrl != null
+                    ? CachedNetworkImage(
+                        imageUrl: product.imageUrl!,
+                        fit: BoxFit.cover,
+                        fadeInDuration: const Duration(milliseconds: 200),
+                        memCacheWidth: 600, // Optimize memory cache size
+                        placeholder: (context, url) => Container(
+                          color: Colors.grey[100],
+                          child: const Center(
+                            child: CircularProgressIndicator(),
+                          ),
+                        ),
+                        errorWidget: (context, url, error) => Container(
+                          color: Colors.white,
+                          child: const Center(
+                            child: Icon(
+                              Icons.image_not_supported,
+                              color: Colors.grey,
+                              size: 30,
+                            ),
+                          ),
+                        ),
+                      )
+                    : Container(
+                        color: Colors.white,
+                        child: const Center(
                           child: Icon(
                             Icons.image_not_supported,
                             color: Colors.grey,
                             size: 30,
                           ),
-                        )
-                      : null,
-                  ),
+                        ),
+                    ),
                 ),
                 
-                // Product Details - Using percentage of total height
-                SizedBox(
-                  height: detailsHeight,
-                  child: Padding(
+                // Product Details - Flexible height for text content
+                Expanded(
+                  child: Container(
                     padding: const EdgeInsets.all(8),
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
@@ -104,7 +113,7 @@ class ProductCard extends StatelessWidget {
                         ? const FittedBox(
                             fit: BoxFit.scaleDown,
                             child: Text(
-                              "Starting From 332 Onwards",
+                              "Click to View Price",
                               style: TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w600,

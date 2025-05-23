@@ -86,7 +86,7 @@ class _HomeScreenState extends State<HomeScreen> {
         scrolledUnderElevation: 0,
         title: Image.asset(
           'assets/images/logo.png',
-          height: 32,
+          height: 45,
           fit: BoxFit.contain,
         ),
         centerTitle: true,
